@@ -349,11 +349,17 @@ CHECK		= sparse
 # warnings and causes the build to stop upon encountering them.
 CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 
+# LGE_CHANGE_S [2011.07.07] M3S build operation : add LGE_CF [START]
+LGE_CF		= -D__CHECK_ENDIAN__ -Wcast-truncate -Wno-paren-string -Wtypesign
+
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
-		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   =
-AFLAGS_MODULE   =
-LDFLAGS_MODULE  =
+		  -Wbitwise -Wno-return-void $(CF) $(LGE_CF)
+# LGE_CHANGE_E [2011.07.07] M3S build operation : add LGE_CF [END]
+
+MODFLAGS	= -DMODULE
+CFLAGS_MODULE   = $(MODFLAGS)
+AFLAGS_MODULE   = $(MODFLAGS)
+LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
@@ -368,7 +374,7 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -w -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
@@ -615,10 +621,48 @@ ifdef CONFIG_DYNAMIC_FTRACE
 endif
 endif
 
+#if any feature should be set in the release mode, define here.
+ifeq ($(TARGET_BUILD_VARIANT),user)
+KBUILD_CFLAGS	+=-DCONFIG_LGE_FEATURE_RELEASE
+endif
+
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
 KBUILD_CFLAGS += $(call cc-option, -fno-inline-functions-called-once)
 endif
+#LGE_CHANGE_S [START]2012.3.30 jaeho.cho@lge.com condition for autorun enable/disable
+ifdef CONFIG_LGE_USB_AUTORUN_ENABLE
+ifeq ($(TARGET_PRODUCT),u0_cdma_usc_us)
+KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN
+KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN_LGE
+endif
+
+ifeq ($(TARGET_PRODUCT),u0_cdma_bm_us)
+KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN
+KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN_LGE
+KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_SERIALNO_REDIRECTION
+endif
+endif
+#LGE_CHANGE_S [END]2012.3.30 jaeho.cho@lge.com condition for autorun enable/disable
+
+#LGE_CHANGE_S [START] 2012.05.30 choongnam.kim@lge.com to enable USBLOCK
+ifeq ($(TARGET_PRODUCT),u0_cdma_trf_us)
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION 
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_PERMANENT_LOCK
+KBUILD_CFLAGS += -DCONFIG_LGE_USB_ACCESS_LOCK_INODE
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USBLOCK_EFS_SYNC
+endif
+ifeq ($(TARGET_PRODUCT),u0_cdma_bm_us)
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION 
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_ENABLE_INODE
+KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USBLOCK_EFS_SYNC
+#LGE_CHANGE_S [START]2012.6.29 jaeho.cho@lge.com change mode by usbmode-manager
+KBUILD_CFLAGS += -DCONFIG_LGE_USB_CHANGE_MODE_USERSPACE
+#LGE_CHANGE_S [END]2012.6.29 jaeho.cho@lge.com change mode by usbmode-manager
+endif
+#LGE_CHANGE_S [END] 2012.05.30 choongnam.kim@lge.com to enable USBLOCK
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)

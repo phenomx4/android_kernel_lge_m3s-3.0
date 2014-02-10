@@ -41,6 +41,11 @@
 #include <mach/dal_axi.h>
 #include <mach/msm_memtypes.h>
 
+#if defined (CONFIG_LGE_RAM_CONSOLE) || defined (CONFIG_LGE_ERS)
+#include <asm/setup.h>
+#include <mach/lge_mem_misc.h>
+#endif
+
 /* EBI THERMAL DRIVER */
 static struct resource msm_ebi0_thermal_resources[] = {
 	{
@@ -181,6 +186,10 @@ struct platform_device msm_device_uart_dm1 = {
 	},
 };
 
+/* LGE_S,[US730], SD card insert->remove issue */
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct resource msm_uart2_dm_resources[] = {
 	{
 		.start = MSM_UART2DM_PHYS,
@@ -224,6 +233,8 @@ struct platform_device msm_device_uart_dm2 = {
 	},
 };
 
+#endif
+/* LGE_E,[US730], SD card insert->remove issue */
 #define MSM_I2C_SIZE          SZ_4K
 #define MSM_I2C_PHYS          0xACD00000
 #define MSM_I2C_2_PHYS        0xACF00000
@@ -1272,3 +1283,87 @@ static int __init msm7630_init_gpio(void)
 }
 
 postcore_initcall(msm7630_init_gpio);
+
+#ifdef CONFIG_LGE_RAM_CONSOLE
+static struct resource ram_console_resource[] = {
+	{
+		.name = "ram_console",
+		.flags = IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device ram_console_device = {
+	.name = "ram_console",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(ram_console_resource),
+	.resource = ram_console_resource,
+};
+
+void __init lge_add_ramconsole_devices(void)
+{
+	struct resource *res = ram_console_resource;
+#if defined (CONFIG_MACH_LGE_M3S) || defined(CONFIG_MACH_MSM7630_U0)
+/*
+	CONFIG_MACH_LGE_M3S
+	meminfo = (
+	  nr_banks = 0x3,
+	  bank = (
+		[0](start = 0x00200000, size = 0x03C00000, node = 0x0, highmem = 0x0),
+		[1](start = 0x07B00000, size = 0x08400000, node = 0x0, highmem = 0x0),
+		[2](start = 0x20000000, size = 0x10000000, node = 0x0, highmem = 0x0),
+*/
+/*
+	CONFIG_MACH_MSM7630_U0
+	meminfo = (
+	  nr_banks = 0x3,
+	  bank = (
+		[0](start = 0x00200000, size = 0x03C00000, node = 0x0, highmem = 0x0),
+		[1](start = 0x07B00000, size = 0x08400000, node = 0x0, highmem = 0x0),
+		[2](start = 0x40000000, size = 0x10000000, node = 0x0, highmem = 0x0),
+*/
+	struct membank *bank;
+
+	// use 1MB from the end of EBI0_CS0 as RAM console area.
+	if(meminfo.nr_banks >= 2)
+		bank = &meminfo.bank[1];
+	else
+		bank = &meminfo.bank[0];
+	res->start = bank->start + bank->size;
+#else /*CONFIG_MACH_LGE_M3S*/
+	struct membank *bank = &meminfo.bank[0];
+	res->start = MSM7X30_EBI1_CS0_BASE + bank->size;
+#endif /*CONFIG_MACH_LGE_M3S*/
+
+	// first half of the ram console will be used for kmsg and the rest is for panic log
+	res->end = res->start + LGE_RAM_CONSOLE_SIZE/2 - 1;
+	printk("RAM CONSOLE START ADDR : 0x%x\n", res->start);
+	printk("RAM CONSOLE END ADDR   : 0x%x\n", res->end);
+	
+	platform_device_register(&ram_console_device);
+}
+#endif /*CONFIG_LGE_RAM_CONSOLE*/
+
+#ifdef CONFIG_LGE_ERS
+static struct platform_device ers_kernel = {
+	.name = "ers-kernel",
+};
+
+void __init lge_add_ers_devices(void)
+{
+	platform_device_register(&ers_kernel);
+}
+
+__WEAK struct lge_panic_handler_platform_data panic_handler_data;
+
+static struct platform_device panic_handler_device = {
+	.name = "panic-handler",
+	.dev    = {
+		.platform_data = &panic_handler_data,
+	}
+};
+
+void __init lge_add_panic_handler_devices(void)
+{
+	platform_device_register(&panic_handler_device);
+}
+#endif /*CONFIG_LGE_ERS*/

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,6 +50,10 @@ struct diag_hdlc_decode_type {
 
 void diag_hdlc_encode(struct diag_send_desc_type *src_desc,
 		      struct diag_hdlc_dest_type *enc);
+
+#if defined (CONFIG_LGE_DIAG_MTC)
+void diag_hdlc_encode_mtc(struct diag_send_desc_type* src_desc, struct diag_hdlc_dest_type* enc);
+#endif /*CONFIG_LGE_DIAG_MTC*/
 
 int diag_hdlc_decode(struct diag_hdlc_decode_type *hdlc);
 

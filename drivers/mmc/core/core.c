@@ -352,8 +352,10 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			 */
 			limit_us = 800000;
 		else
-			limit_us = 100000;
-
+//LGE_CHANGE_S [U0 CDMA] [hongsic.kim@lge.com] 2012-07-23 [Start]
+//QCT case Answer for TD(113153) : increase the read timeout value, modified to be processed normally. 100000 => 300000
+			limit_us = 300000;
+//LGE_CHANGE_S [U0 CDMA] [hongsic.kim@lge.com] 2012-07-23 [End]
 		/*
 		 * SDHC cards always use these fixed values.
 		 */
@@ -1097,7 +1099,18 @@ void mmc_power_up(struct mmc_host *host)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
+
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim From G1TDR Porting delay(10)->(20) [Start]
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Augmenting delay-time for some crappy card.
+	* 2011-11-10, warkap.seo@lge.com 
+	*/
+	mmc_delay(20);
+#else
 	mmc_delay(10);
+#endif
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim From G1TDR Porting delay(10)->(20) [End]
 
 	host->ios.clock = host->f_init;
 
@@ -1108,7 +1121,18 @@ void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
+
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim From G1TDR Porting delay(10)->(20) [Start]
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Augmenting delay-time for some crappy card.
+	* 2011-11-10, warkap.seo@lge.com 
+	*/
+	mmc_delay(20);
+#else
 	mmc_delay(10);
+#endif
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim From G1TDR Porting delay(10)->(20) [End]
 
 	mmc_host_clk_release(host);
 }
@@ -1268,6 +1292,14 @@ void mmc_detach_bus(struct mmc_host *host)
  */
 void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 {
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Checking for result of delayed-work.
+	* 2011-11-10, warkap.seo@lge.com
+	*/
+	int result_delayed_work = -1;
+#endif
+
 #ifdef CONFIG_MMC_DEBUG
 	unsigned long flags;
 	spin_lock_irqsave(&host->lock, flags);
@@ -1277,7 +1309,16 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 
 	wake_lock(&host->detect_wake_lock);
 	host->detect_change = 1;
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Checking for result of delayed-work.
+	* 2011-11-10, warkap.seo@lge.com
+	*/
+	result_delayed_work = mmc_schedule_delayed_work(&host->detect, delay);
+	printk(KERN_INFO "[LGE][mmc][%-18s( )] result_delayed_work:%d, delay:%ld\n", __func__, result_delayed_work, delay);
+#else
 	mmc_schedule_delayed_work(&host->detect, delay);
+#endif
 }
 
 EXPORT_SYMBOL(mmc_detect_change);
@@ -1844,6 +1885,14 @@ void mmc_rescan(struct work_struct *work)
 		container_of(work, struct mmc_host, detect.work);
 	bool extend_wakelock = false;
 
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Adding Print
+	* 2011-11-10, warkap.seo@lge.com
+	*/
+	printk(KERN_INFO "[LGE][MMC][%-18s( ) START!] \n", __func__);
+#endif
+
 	if (host->rescan_disable)
 		return;
 
@@ -1934,6 +1983,7 @@ void mmc_stop_host(struct mmc_host *host)
 
 		mmc_claim_host(host);
 		mmc_detach_bus(host);
+		mmc_power_off(host);
 		mmc_release_host(host);
 		mmc_bus_put(host);
 		return;
@@ -2180,6 +2230,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 			host->bus_ops->remove(host);
 
 		mmc_detach_bus(host);
+		mmc_power_off(host);
 		mmc_release_host(host);
 		host->pm_flags = 0;
 		break;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,12 +32,12 @@
 
 /* AF Total steps parameters */
 #define S5K4E1_TOTAL_STEPS_NEAR_TO_FAR	32
-
-#define S5K4E1_REG_PREV_FRAME_LEN_1	31
-#define S5K4E1_REG_PREV_FRAME_LEN_2	32
-#define S5K4E1_REG_PREV_LINE_LEN_1	33
-#define S5K4E1_REG_PREV_LINE_LEN_2	34
-
+// LGE_CHANGE_S 2012-04-10 (keonwoo01.park@lge.com) Preview white error guide from QCT
+#define S5K4E1_REG_PREV_FRAME_LEN_1	27 //31
+#define S5K4E1_REG_PREV_FRAME_LEN_2	28 //32
+#define S5K4E1_REG_PREV_LINE_LEN_1	29 //33
+#define S5K4E1_REG_PREV_LINE_LEN_2	30 //34
+// LGE_CHANGE_E 2012-04-10 (keonwoo01.park@lge.com) Preview white error guide from QCT
 #define S5K4E1_REG_SNAP_FRAME_LEN_1	15
 #define S5K4E1_REG_SNAP_FRAME_LEN_2	16
 #define  S5K4E1_REG_SNAP_LINE_LEN_1	17
@@ -45,10 +45,17 @@
 #define MSB                             1
 #define LSB                             0
 
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+//#undef CDBG
+//#define CDBG(fmt, args...) printk(KERN_INFO "[s5k4e1] " fmt, ##args)
+//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+
 struct s5k4e1_work_t {
 	struct work_struct work;
 };
-
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+static uint8_t IS_MMS_RECODER_SIZE;
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 static struct s5k4e1_work_t *s5k4e1_sensorw;
 static struct s5k4e1_work_t *s5k4e1_af_sensorw;
 static struct i2c_client *s5k4e1_af_client;
@@ -85,6 +92,11 @@ static uint16_t prev_line_length_pck;
 static uint16_t prev_frame_length_lines;
 static uint16_t snap_line_length_pck;
 static uint16_t snap_frame_length_lines;
+
+/* LGE_CHANGE_S : 2012.07.19 sungmin.cho@lge.com 
+* skip bad frame in low light condition */ 
+int32_t is_lowlight = 0;
+/* LGE_CHANGE_E : 2012.07.19 sungmin.cho@lge.com */
 
 static int s5k4e1_i2c_rxdata(unsigned short saddr,
 		unsigned char *rxdata, int length)
@@ -161,7 +173,7 @@ static int32_t s5k4e1_i2c_write_b_sensor(unsigned short waddr, uint8_t bdata)
 	buf[0] = (waddr & 0xFF00) >> 8;
 	buf[1] = (waddr & 0x00FF);
 	buf[2] = bdata;
-	CDBG("i2c_write_b addr = 0x%x, val = 0x%x\n", waddr, bdata);
+//	CDBG("i2c_write_b addr = 0x%x, val = 0x%x\n", waddr, bdata); //keonwoo01.park@lge.com 20120305 CDBG delete
 	rc = s5k4e1_i2c_txdata(s5k4e1_client->addr, buf, 3);
 	if (rc < 0) {
 		CDBG("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
@@ -213,7 +225,7 @@ static int32_t s5k4e1_af_i2c_write_b_sensor(uint8_t waddr, uint8_t bdata)
 	memset(buf, 0, sizeof(buf));
 	buf[0] = waddr;
 	buf[1] = bdata;
-	CDBG("i2c_write_b addr = 0x%x, val = 0x%x\n", waddr, bdata);
+//	CDBG("i2c_write_b addr = 0x%x, val = 0x%x\n", waddr, bdata);//keonwoo01.park@lge.com 20120305 CDBG delete
 	rc = s5k4e1_af_i2c_txdata(s5k4e1_af_client->addr << 1, buf, 2);
 	if (rc < 0) {
 		pr_err("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
@@ -221,6 +233,157 @@ static int32_t s5k4e1_af_i2c_write_b_sensor(uint8_t waddr, uint8_t bdata)
 	}
 	return rc;
 }
+
+#if 1
+////////////////////////////////////////////////
+//[QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+#define S5K4E1_EEPROM_SADDR 	0x28 >> 1
+#define S5K4E1_EEPROM_START_ADDR 0x0070
+#define S5K4E1_EEPROM_AWB_START_ADDR 0x0060
+
+#define S5K4E1_EEPROM_DATA_SIZE	896
+#define S5K4E1_EEPROM_AWB_DATA_SIZE	6
+
+#define RED_START 	0
+#define GR_START 	224
+#define GB_START 	448
+#define BLUE_START 	672
+// #define CRC_ADDR	0x7E
+
+int32_t s5k4e1_i2c_read_eeprom_burst(unsigned char saddr, 
+		unsigned char *rxdata, int length)
+{
+	int32_t rc = 0;
+	unsigned char tmp_buf[2];
+	struct i2c_msg msgs[] = {
+		{
+			.addr  = saddr,
+			.flags = 0,
+			.len   = 2,
+			.buf   = tmp_buf,
+		},
+		{
+			.addr  = saddr,
+			.flags = I2C_M_RD,
+			.len   = length,
+			.buf   = rxdata,
+		},
+	};
+	tmp_buf[0] = (unsigned char)((S5K4E1_EEPROM_START_ADDR & 0xFF00) >> 8);
+	tmp_buf[1] = (unsigned char)(S5K4E1_EEPROM_START_ADDR & 0xFF);
+	printk("msgs[0].buf = 0x%x,  msgs[0].buf[1]=0x%x\n", msgs[0].buf[0], msgs[0].buf[1] );
+	printk(" tmp_buf[0] = 0x%x,  tmp_buf[1]=0x%x\n", tmp_buf[0], tmp_buf[1] );
+	
+	rc = i2c_transfer(s5k4e1_af_client->adapter, msgs, 2);
+	if (rc < 0)
+		pr_err("s5k4e1_i2c_read_eeprom_burst failed 0x%x\n", saddr);
+	return rc;
+}
+
+int32_t s5k4e1_i2c_read_eeprom_burst_for_awb(unsigned char saddr, 
+		unsigned char *rxdata, int length)
+{
+	int32_t rc = 0;
+	unsigned char tmp_buf[2];
+	struct i2c_msg msgs[] = {
+		{
+			.addr  = saddr,
+			.flags = 0,
+			.len   = 2,
+			.buf   = tmp_buf,
+		},
+		{
+			.addr  = saddr,
+			.flags = I2C_M_RD,
+			.len   = length,
+			.buf   = rxdata,
+		},
+	};
+	CDBG("In s5k4e1_i2c_read_eeprom_burst_for_awb");
+	tmp_buf[0] = (unsigned char)((S5K4E1_EEPROM_AWB_START_ADDR & 0xFF00) >> 8);
+	tmp_buf[1] = (unsigned char)(S5K4E1_EEPROM_AWB_START_ADDR & 0xFF);
+	CDBG("msgs[0].buf = 0x%x,  msgs[0].buf[1]=0x%x\n", msgs[0].buf[0], msgs[0].buf[1] );
+	CDBG(" tmp_buf[0] = 0x%x,  tmp_buf[1]=0x%x\n", tmp_buf[0], tmp_buf[1] );
+	
+	rc = i2c_transfer(s5k4e1_af_client->adapter, msgs, 2);
+	if (rc < 0)
+		CDBG("s5k4e1_i2c_read_eeprom_burst failed 0x%x\n", saddr);
+	return rc;
+}
+
+
+static int s5k4e1_read_eeprom_data(struct sensor_cfg_data *cfg)
+{
+	int32_t rc = 0;
+	uint8_t eepromdata[S5K4E1_EEPROM_DATA_SIZE];
+	uint8_t eepromdata_awb[S5K4E1_EEPROM_AWB_DATA_SIZE];
+//	uint32_t crc_red= 0, crc_gr= 0, crc_gb= 0, crc_blue=0;
+	int i;
+
+ 	memset(eepromdata, 0, sizeof(eepromdata));
+	// for LSC data
+	//msleep(20);
+#if 0	
+	if(s5k4e1_i2c_read_eeprom_burst(S5K4E1_EEPROM_SADDR, 
+		eepromdata, S5K4E1_EEPROM_DATA_SIZE) < 0) {
+		pr_err("%s: Error Reading EEPROM : page_no:0 \n", __func__);
+		return rc;
+	}
+
+	for (i = 0; i < ROLLOFF_CALDATA_SIZE; i++) {
+		cfg->cfg.calib_info.rolloff.r_gain[i] = eepromdata[RED_START + i];
+		crc_red += eepromdata[RED_START + i];
+		printk("[QCTK_EEPROM] R (0x%x, %d)\n", RED_START + i, eepromdata[RED_START + i]);
+		
+		cfg->cfg.calib_info.rolloff.gr_gain[i] = eepromdata[GR_START + i];
+		crc_gr += eepromdata[GR_START + i];
+		printk("[QCTK_EEPROM] GR (0x%x, %d)\n", GR_START + i, eepromdata[GR_START + i]);
+
+		cfg->cfg.calib_info.rolloff.gb_gain[i] = eepromdata[GB_START + i];
+		crc_gb += eepromdata[GB_START + i];
+		printk("[QCTK_EEPROM] GB (0x%x, %d)\n", GB_START + i, eepromdata[GB_START + i]);
+
+		cfg->cfg.calib_info.rolloff.b_gain[i] = eepromdata[BLUE_START + i];
+		crc_blue += eepromdata[BLUE_START + i];
+		printk("[QCTK_EEPROM] B (0x%x, %d)\n", BLUE_START + i, eepromdata[BLUE_START + i]);
+		
+	}
+#endif
+#if 0	
+	// CRC check
+	if (((eepromdata[CRC_ADDR]<<8)+eepromdata[CRC_ADDR+1]) != crc_5100)
+		{
+			pr_err("%s: CRC error R(read crc:0x%x, cal crc:0x%x)\n", __func__, 
+			(eepromdata[CRC_ADDR]<<8)+eepromdata[CRC_ADDR+1], crc_red);
+			// return -EFAULT;
+		}
+#endif	
+#if 1
+	// for AWB data - from Rolloff data
+	if(s5k4e1_i2c_read_eeprom_burst_for_awb(S5K4E1_EEPROM_SADDR, 
+		eepromdata_awb, S5K4E1_EEPROM_AWB_DATA_SIZE) < 0) {
+		CDBG("%s: Error Reading EEPROM : page_no:0 \n", __func__);
+		return rc;
+	}		
+
+	for (i = 0; i < S5K4E1_EEPROM_AWB_DATA_SIZE; i++)
+		CDBG("[QCTK_EEPROM] eepromdata_awb[%d] = 0x%4x\n", i, eepromdata_awb[i]);
+	
+	cfg->cfg.calib_info.r_over_g = (eepromdata_awb[1] << 8) + eepromdata_awb[0];
+	CDBG("[QCTK_EEPROM] r_over_g = 0x%4x\n", cfg->cfg.calib_info.r_over_g);
+	cfg->cfg.calib_info.b_over_g = (eepromdata_awb[3] << 8) + eepromdata_awb[2];
+	CDBG("[QCTK_EEPROM] b_over_g = 0x%4x\n", cfg->cfg.calib_info.b_over_g);
+	cfg->cfg.calib_info.gr_over_gb = (eepromdata_awb[5] << 8) + eepromdata_awb[4];
+	CDBG("[QCTK_EEPROM] gr_over_gb = 0x%4x\n", cfg->cfg.calib_info.gr_over_gb);
+
+#endif
+
+	printk("s5k4e1_read_eeprom_data==============================>end\n");	
+	return 0;
+}
+//[QCTK] CALC end keonwoo01.park@lge.com 2012-05-19 from QCT
+////////////////////////////////////////////////
+#endif
 
 static void s5k4e1_start_stream(void)
 {
@@ -299,6 +462,10 @@ static int32_t s5k4e1_set_fps(struct fps_cfg   *fps)
 
 	s5k4e1_ctrl->fps_divider = fps->fps_div;
 	s5k4e1_ctrl->pict_fps_divider = fps->pict_fps_div;
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+	IS_MMS_RECODER_SIZE = fps->Is_15fps;
+	CDBG("s5k4e1_set_fps = %d \n", IS_MMS_RECODER_SIZE);
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 
 	if (s5k4e1_ctrl->sensormode == SENSOR_PREVIEW_MODE) {
 		total_lines_per_frame = (uint16_t)
@@ -337,17 +504,23 @@ static int32_t s5k4e1_write_exp_gain(uint16_t gain, uint32_t line)
 	s5k4e1_i2c_write_b_sensor(0x0204, s5k4e1_byte(gain, MSB));
 	s5k4e1_i2c_write_b_sensor(0x0205, s5k4e1_byte(gain, LSB));
 
-	if (line > (prev_frame_length_lines - 4)) {
-		fl_lines = line+4;
+	if (line > (prev_frame_length_lines - 8)) {
+		fl_lines = line+8;
 		s5k4e1_group_hold_on();
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+		if(IS_MMS_RECODER_SIZE == 0){
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 		s5k4e1_i2c_write_b_sensor(0x0340, s5k4e1_byte(fl_lines, MSB));
 		s5k4e1_i2c_write_b_sensor(0x0341, s5k4e1_byte(fl_lines, LSB));
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+		}
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 		/* Coarse Integration Time */
 		s5k4e1_i2c_write_b_sensor(0x0202, s5k4e1_byte(line, MSB));
 		s5k4e1_i2c_write_b_sensor(0x0203, s5k4e1_byte(line, LSB));
 		s5k4e1_group_hold_off();
-	} else if (line < (fl_lines - 4)) {
-		fl_lines = line+4;
+	} else if (line < (fl_lines - 8)) {
+		fl_lines = line+8;
 		if (fl_lines < prev_frame_length_lines)
 			fl_lines = prev_frame_length_lines;
 
@@ -355,22 +528,45 @@ static int32_t s5k4e1_write_exp_gain(uint16_t gain, uint32_t line)
 		/* Coarse Integration Time */
 		s5k4e1_i2c_write_b_sensor(0x0202, s5k4e1_byte(line, MSB));
 		s5k4e1_i2c_write_b_sensor(0x0203, s5k4e1_byte(line, LSB));
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+		if(IS_MMS_RECODER_SIZE == 0){
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 		s5k4e1_i2c_write_b_sensor(0x0340, s5k4e1_byte(fl_lines, MSB));
 		s5k4e1_i2c_write_b_sensor(0x0341, s5k4e1_byte(fl_lines, LSB));
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+		}
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+		//CDBG("#QCT 22 s5k4e1_write_exp_gain = %d, %d \n", line, fl_lines);		// comment			 
+
 		s5k4e1_group_hold_off();
 	} else {
-		fl_lines = line+4;
+		fl_lines = line+8;
 		s5k4e1_group_hold_on();
 		/* Coarse Integration Time */
 		s5k4e1_i2c_write_b_sensor(0x0202, s5k4e1_byte(line, MSB));
 		s5k4e1_i2c_write_b_sensor(0x0203, s5k4e1_byte(line, LSB));
 		s5k4e1_group_hold_off();
 	}
+	/* LGE_CHANGE_S : 2012.07.19 sungmin.cho@lge.com 
+	* skip bad frame in low light condition */ 
+	if(line > 1000/*3910*/) 
+		is_lowlight = 1;
+	else
+		is_lowlight = 0; 
+	/* LGE_CHANGE_E : 2012.07.19 sungmin.cho@lge.com */
+	CDBG("#QCT 22 s5k4e1_write_exp_gain: line = %d, gain = %d, fl_lines = %d \n", line, gain, fl_lines); //add	
 	return rc;
 }
 
 static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 {
+#if 1 //keonwoo01.park@lge.com =>ÇÊ¿ä¾ø´Â º¯¼ö »èÁ¦
+	uint16_t max_legal_gain = 0x0200;
+	uint32_t fl_lines;
+	int32_t rc = 0;
+	uint8_t gain_msb, gain_lsb;
+	uint8_t intg_time_msb, intg_time_lsb;
+#else
 	uint16_t max_legal_gain = 0x0200;
 	uint16_t min_ll_pck = 0x0AB2;
 	uint32_t ll_pck, fl_lines;
@@ -380,18 +576,24 @@ static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 	uint8_t intg_time_msb, intg_time_lsb;
 	uint8_t ll_pck_msb, ll_pck_lsb;
 
+#endif
 	if (gain > max_legal_gain) {
 		pr_debug("Max legal gain Line:%d\n", __LINE__);
 		gain = max_legal_gain;
 	}
 
 	pr_debug("s5k4e1_write_exp_gain : gain = %d line = %d\n", gain, line);
+	CDBG("#QCT s5k4e1_set_pict_exp_gain = %d, %d \n", gain, line);
+
+//Start : LGE BSP_CAMERA tao.jin@lge.com 2011-10-31 : code modification for QCT guide
+#if 0 //ORZ
+
 	line = (uint32_t) (line * s5k4e1_ctrl->pict_fps_divider);
 	fl_lines = snap_frame_length_lines;
 	ll_pck = snap_line_length_pck;
 
 	if (fl_lines < (line / 0x400))
-		ll_ratio = (line / (fl_lines - 4));
+		ll_ratio = (line / (fl_lines - 8));
 	else
 		ll_ratio = 0x400;
 
@@ -420,6 +622,44 @@ static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 	s5k4e1_i2c_write_b_sensor(0x0202, intg_time_msb);
 	s5k4e1_i2c_write_b_sensor(0x0203, intg_time_lsb);
 	s5k4e1_group_hold_off();
+#endif
+
+#if 1 //QCT
+
+		fl_lines = snap_frame_length_lines;
+
+		if (fl_lines - 8 < line)
+			fl_lines = line + 8;
+
+		gain_msb = (uint8_t) ((gain & 0xFF00) >> 8);
+		gain_lsb = (uint8_t) (gain & 0x00FF);
+
+		intg_time_msb = (uint8_t) ((line & 0xFF00) >> 8);
+		intg_time_lsb = (uint8_t) (line & 0x00FF);
+
+		s5k4e1_group_hold_on();
+		s5k4e1_i2c_write_b_sensor(0x0340, s5k4e1_byte(fl_lines, MSB));
+		s5k4e1_i2c_write_b_sensor(0x0341, s5k4e1_byte(fl_lines, LSB));
+
+		s5k4e1_i2c_write_b_sensor(0x0204, gain_msb); /* Analogue Gain */
+		s5k4e1_i2c_write_b_sensor(0x0205, gain_lsb);
+
+		/* Coarse Integration Time */
+		s5k4e1_i2c_write_b_sensor(0x0202, intg_time_msb);
+		s5k4e1_i2c_write_b_sensor(0x0203, intg_time_lsb);
+
+		s5k4e1_group_hold_off();
+// LGE_CHANGE_S 2012-04-13 (keonwoo01.park@lge.com) reduce the shutter lag time guide from QCT
+//		msleep(130);//need to revisit
+// LGE_CHANGE_S 2012-04-13 (keonwoo01.park@lge.com) reduce the shutter lag time guide from QCT
+
+		CDBG("#QCT s5k4e1_set_pict_exp_gain after: gain,line,fl_lines, snap_frame_length_lines 0x%x, 0x%x, 0x%x, 0x%x ",
+			gain,line,fl_lines, snap_frame_length_lines);
+		CDBG("#QCT s5k4e1_set_pict_exp_gain after: gain,line,fl_lines, snap_frame_length_lines %d, %d, %d, %d ",
+			gain,line,fl_lines, snap_frame_length_lines);
+
+#endif
+//End : LGE BSP_CAMERA tao.jin@lge.com 2011-10-31 : code modification for QCT guide
 
 	return rc;
 }
@@ -444,7 +684,38 @@ static int32_t s5k4e1_move_focus(int direction,
 		next_position = 0;
 
 	code_val_msb = next_position >> 4;
-	code_val_lsb = (next_position & 0x000F) << 4;
+	code_val_lsb = (((next_position & 0x000F) << 4)|0x0F); //1111: 2 code increment, delay time = 200ms
+
+/* Test for AF moter noise
+//	code_val_lsb = (next_position & 0x000F) << 4;//0000: Normal
+	code_val_lsb = (((next_position & 0x000F) << 4)|0x0F); //1111: 2 code increment, delay time = 200us
+
+//   delay time = 0us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x04);//0100: 8 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x08);//1000: 4 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0C);//1100: 2 code increment
+
+//   delay time =  50us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x05);//0101: 8 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x09);//1001: 4 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0D);//1101: 2 code increment
+
+//   delay time = 100us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x06);//0110: 8 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0A);//1010: 4 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0E);//1110: 2 code increment
+
+//   delay time = 200us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x07);//0111: 8 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0B);//1011: 4 code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x0F);//1111: 2 code increment
+
+//   Normal code increment
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x01);//0001: delay time = 50us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x02);//0010: delay time = 100us
+//	code_val_lsb = (((next_position & 0x000F) << 4)|0x03);//0011: delay time = 200us
+
+Test for AF moter noise */
 
 	if (s5k4e1_af_i2c_write_b_sensor(code_val_msb, code_val_lsb) < 0) {
 		pr_err("move_focus failed at line %d ...\n", __LINE__);
@@ -485,6 +756,7 @@ static int32_t s5k4e1_test(enum s5k4e1_test_mode_t mo)
 static void s5k4e1_reset_sensor(void)
 {
 	s5k4e1_i2c_write_b_sensor(0x103, 0x1);
+	s5k4e1_i2c_write_b_sensor(0x3030, 0x06);/* streaming off *///keonwoo20120208 register Ãß°¡
 }
 
 static int32_t s5k4e1_sensor_setting(int update_type, int rt)
@@ -498,25 +770,41 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 
 	if (update_type == REG_INIT) {
 		s5k4e1_reset_sensor();
+#if 1 //keonwoo01.park@lge.com 2012-02-08 => ¾÷Ã¼ ¿ä±¸»çÇ× Àû¿ë
+		s5k4e1_i2c_write_b_table(s5k4e1_regs.rec_settings,
+				s5k4e1_regs.rec_size);
+		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_mipi,
+				s5k4e1_regs.reg_mipi_size);
+		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_pll_p,
+				s5k4e1_regs.reg_pll_p_size);
+#else
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_mipi,
 				s5k4e1_regs.reg_mipi_size);
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.rec_settings,
 				s5k4e1_regs.rec_size);
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_pll_p,
 				s5k4e1_regs.reg_pll_p_size);
+#endif
 		CSI_CONFIG = 0;
 	} else if (update_type == UPDATE_PERIODIC) {
 		if (rt == RES_PREVIEW)
+		{
 			s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_prev,
 					s5k4e1_regs.reg_prev_size);
+			/* LGE_CHANGE_S : 2012.07.19 sungmin.cho@lge.com 
+			* skip bad frame in low light condition */ 
+			if(is_lowlight)
+				msleep(50);
+			/* LGE_CHANGE_E : 2012.07.19 sungmin.cho@lge.com */
+		}
 		else
 			s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_snap,
 					s5k4e1_regs.reg_snap_size);
-		msleep(20);
+//		msleep(20);// LGE_CHANGE_S 2012-05-19 (keonwoo01.park@lge.com) delete delay time guide from samsung sensor
 		if (!CSI_CONFIG) {
 			msm_camio_vfe_clk_rate_set(192000000);
 			s5k4e1_csi_params.data_format = CSI_10BIT;
-			s5k4e1_csi_params.lane_cnt = 1;
+			s5k4e1_csi_params.lane_cnt = 2;
 			s5k4e1_csi_params.lane_assign = 0xe4;
 			s5k4e1_csi_params.dpcm_scheme = 0;
 			s5k4e1_csi_params.settle_cnt = 24;
@@ -525,7 +813,12 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 			CSI_CONFIG = 1;
 		}
 		s5k4e1_start_stream();
-		msleep(30);
+
+		/* LGE_CHANGE_S : 2012.07.19 sungmin.cho@lge.com 
+		* skip bad frame in low light condition */ 
+		if(rt == RES_PREVIEW && is_lowlight)
+			msleep(30);
+		/* LGE_CHANGE_E : 2012.07.19 sungmin.cho@lge.com */
 	}
 	return rc;
 }
@@ -624,7 +917,13 @@ static int32_t s5k4e1_power_down(void)
 static int s5k4e1_probe_init_done(const struct msm_camera_sensor_info *data)
 {
 	CDBG("probe done\n");
+//LGE_S,For camera warning removal
+//lavany start
+#if 0
 	gpio_free(data->sensor_reset);
+#endif
+//lavanya end
+//LGE_E,For camera warning removal
 	return 0;
 }
 
@@ -639,6 +938,11 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	CDBG("%s: %d\n", __func__, __LINE__);
 	CDBG(" s5k4e1_probe_init_sensor is called\n");
 
+#if 0//keonwoo reset pin test
+	gpio_free(data->sensor_reset); //1125 Test code for Reset pin
+
+	mdelay(5);//1125 Test code for Reset pin
+
 	rc = gpio_request(data->sensor_reset, "s5k4e1");
 	CDBG(" s5k4e1_probe_init_sensor\n");
 	if (!rc) {
@@ -647,10 +951,11 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 		msleep(50);
 		gpio_set_value_cansleep(data->sensor_reset, 1);
 		msleep(20);
-	} else
-		goto gpio_req_fail;
-
+	} else {
+		goto init_probe_done;
+	}
 	msleep(20);
+#endif
 
 	s5k4e1_i2c_read(regaddress1, &chipid1, 1);
 	if (chipid1 != 0x4E) {
@@ -669,21 +974,12 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	CDBG("ID: %d\n", chipid1);
 	CDBG("ID: %d\n", chipid1);
 
-	return rc;
-
+	goto init_probe_done;
 init_probe_fail:
 	CDBG(" s5k4e1_probe_init_sensor fails\n");
-	gpio_set_value_cansleep(data->sensor_reset, 0);
 	s5k4e1_probe_init_done(data);
-	if (data->vcm_enable) {
-		int ret = gpio_request(data->vcm_pwd, "s5k4e1_af");
-		if (!ret) {
-			gpio_direction_output(data->vcm_pwd, 0);
-			msleep(20);
-			gpio_free(data->vcm_pwd);
-		}
-	}
-gpio_req_fail:
+init_probe_done:
+	CDBG(" s5k4e1_probe_init_sensor finishes\n");
 	return rc;
 }
 
@@ -723,7 +1019,7 @@ int s5k4e1_sensor_open_init(const struct msm_camera_sensor_info *data)
 
 	snap_line_length_pck =
 	(s5k4e1_regs.reg_snap[S5K4E1_REG_SNAP_LINE_LEN_1].wdata << 8) |
-		s5k4e1_regs.reg_snap[S5K4E1_REG_SNAP_LINE_LEN_1].wdata;
+		s5k4e1_regs.reg_snap[S5K4E1_REG_SNAP_LINE_LEN_2].wdata;
 
 	/* enable mclk first */
 	msm_camio_clk_rate_set(S5K4E1_MASTER_CLK_RATE);
@@ -732,12 +1028,15 @@ int s5k4e1_sensor_open_init(const struct msm_camera_sensor_info *data)
 		goto init_fail;
 
 	CDBG("init settings\n");
+	is_lowlight = 0;
 	if (s5k4e1_ctrl->prev_res == QTR_SIZE)
 		rc = s5k4e1_sensor_setting(REG_INIT, RES_PREVIEW);
 	else
 		rc = s5k4e1_sensor_setting(REG_INIT, RES_CAPTURE);
 	s5k4e1_ctrl->fps = 30 * Q8;
 
+	//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+#if 0
 	/* enable AF actuator */
 	if (s5k4e1_ctrl->sensordata->vcm_enable) {
 		CDBG("enable AF actuator, gpio = %d\n",
@@ -760,6 +1059,9 @@ int s5k4e1_sensor_open_init(const struct msm_camera_sensor_info *data)
 			gpio_free(s5k4e1_ctrl->sensordata->vcm_pwd);
 		}
 	}
+#endif
+	//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+
 	if (rc < 0)
 		goto init_fail;
 	else
@@ -902,11 +1204,14 @@ int s5k4e1_sensor_config(void __user *argp)
 	long   rc = 0;
 	if (copy_from_user(&cdata,
 				(void *)argp,
-				sizeof(struct sensor_cfg_data)))
+				sizeof(struct sensor_cfg_data))) {
+
+		CDBG("<< %s END return -EFAULT", __func__);
 		return -EFAULT;
+	}
+
 	mutex_lock(&s5k4e1_mut);
-	CDBG("s5k4e1_sensor_config: cfgtype = %d\n",
-			cdata.cfgtype);
+	CDBG("s5k4e1_sensor_config: cfgtype = %d\n",cdata.cfgtype);//keonwoo01.park@lge.com 20120305 CDBG delete
 	switch (cdata.cfgtype) {
 	case CFG_GET_PICT_FPS:
 		s5k4e1_get_pict_fps(
@@ -918,6 +1223,17 @@ int s5k4e1_sensor_config(void __user *argp)
 			sizeof(struct sensor_cfg_data)))
 			rc = -EFAULT;
 		break;
+// [QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+		case CFG_GET_CALIB_DATA:
+			CDBG("CFG_GET_CALIB_DATA");
+			rc = s5k4e1_read_eeprom_data(&cdata);
+
+			if (copy_to_user((void *)argp,
+					&cdata,
+					sizeof(struct sensor_cfg_data)))
+				rc = -EFAULT;
+			break;
+// [QCTK] CALC end keonwoo01.park@lge.com 2012-05-19 from QCT
 	case CFG_GET_PREV_L_PF:
 		cdata.cfg.prevl_pf =
 			s5k4e1_get_prev_lines_pf();
@@ -963,6 +1279,10 @@ int s5k4e1_sensor_config(void __user *argp)
 			rc = -EFAULT;
 		break;
 	case CFG_SET_FPS:
+		CDBG("case CFG_SET_FPS");
+		rc = s5k4e1_set_fps(&(cdata.cfg.fps));
+		break;
+
 	case CFG_SET_PICT_FPS:
 		rc = s5k4e1_set_fps(&(cdata.cfg.fps));
 		break;
@@ -1012,14 +1332,24 @@ static int s5k4e1_sensor_release(void)
 
 	mutex_lock(&s5k4e1_mut);
 	s5k4e1_power_down();
+//LGE_S,For camera warning removal
+//lavanya start
+#if 0
 	msleep(20);
 	gpio_set_value_cansleep(s5k4e1_ctrl->sensordata->sensor_reset, 0);
 	usleep_range(5000, 5100);
 	gpio_free(s5k4e1_ctrl->sensordata->sensor_reset);
+#endif
+//lavanya end
+//LGE_E,For camera warning removal
+	//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+#if 0
 	if (s5k4e1_ctrl->sensordata->vcm_enable) {
-		gpio_set_value_cansleep(s5k4e1_ctrl->sensordata->vcm_pwd, 0);
+		gpio_direction_output(s5k4e1_ctrl->sensordata->vcm_pwd, 0);
 		gpio_free(s5k4e1_ctrl->sensordata->vcm_pwd);
 	}
+#endif
+	//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
 	kfree(s5k4e1_ctrl);
 	s5k4e1_ctrl = NULL;
 	CDBG("s5k4e1_release completed\n");
@@ -1056,19 +1386,13 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 	s->s_init = s5k4e1_sensor_open_init;
 	s->s_release = s5k4e1_sensor_release;
 	s->s_config  = s5k4e1_sensor_config;
-	s->s_mount_angle = info->sensor_platform_info->mount_angle;
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2011-12-07 fix camera sensor orientation
+//	s->s_mount_angle = info->sensor_platform_info->mount_angle;
+	s->s_mount_angle = 0;
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2011-12-07 fix camera sensor orientation
 	gpio_set_value_cansleep(info->sensor_reset, 0);
 	s5k4e1_probe_init_done(info);
-	/* Keep vcm_pwd to OUT Low */
-	if (info->vcm_enable) {
-		rc = gpio_request(info->vcm_pwd, "s5k4e1_af");
-		if (!rc) {
-			gpio_direction_output(info->vcm_pwd, 0);
-			msleep(20);
-			gpio_free(info->vcm_pwd);
-		} else
-			return rc;
-	}
+
 	return rc;
 
 probe_fail_3:

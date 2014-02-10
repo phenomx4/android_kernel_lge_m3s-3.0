@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,7 +30,16 @@
 #include <linux/smsc911x.h>
 #include <linux/ofn_atlab.h>
 #include <linux/power_supply.h>
+#ifdef CONFIG_HAPTIC_ISA1200
 #include <linux/i2c/isa1200.h>
+#endif
+#include <linux/pwm.h>
+#include <linux/pmic8058-pwm.h>
+//20110721 hyeongwoo.seo@lge.com Add PMIC Vib Driver [START]
+#if defined(CONFIG_PMIC8058_VIBRATOR)
+#include <linux/pmic8058-vibrator.h>
+#endif
+//20110721 hyeongwoo.seo@lge.com[END]
 #include <linux/i2c/tsc2007.h>
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
@@ -93,36 +102,40 @@
 #include "board-msm7x30-regulator.h"
 #include "pm.h"
 
+#if defined(CONFIG_LGE_RAM_CONSOLE) || defined(CONFIG_LGE_ERS)
+#include <mach/lge_mem_misc.h>
+#include <linux/proc_fs.h>
+#endif /*CONFIG_LGE_RAM_CONSOLE || CONFIG_LGE_ERS*/
+
+#ifdef CONFIG_LGE_BOARD_BRINGUP
+#include <mach/board_lge.h>
+#endif
+
+#ifdef CONFIG_MACH_MSM7630_U0_CDMA
+#define MSM_PMEM_SF_SIZE	0x2100000
+#else
 #define MSM_PMEM_SF_SIZE	0x1700000
+#endif
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-#define MSM_FB_PRIM_BUF_SIZE   (864 * 480 * 4 * 3) /* 4bpp * 3 Pages */
+#define MSM_FB_SIZE            0x780000
 #else
-#define MSM_FB_PRIM_BUF_SIZE   (864 * 480 * 4 * 2) /* 4bpp * 2 Pages */
+#define MSM_FB_SIZE            0x500000
 #endif
-
-#ifdef CONFIG_FB_MSM_HDMI_ADV7520_PANEL
-#define MSM_FB_EXT_BUF_SIZE (1280 * 720 * 2 * 1) /* 2 bpp x 1 page */
-#else
-#define MSM_FB_EXT_BUF_SIZE    0
-#endif
-
-#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
-/* width x height x 3 bpp x 2 frame buffer */
-#define MSM_FB_OVERLAY0_WRITEBACK_SIZE roundup((864 * 480 * 3 * 2), 4096)
-#else
-#define MSM_FB_OVERLAY0_WRITEBACK_SIZE  0
-#endif
-
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)
-
-#define MSM_PMEM_ADSP_SIZE      0x1E00000
+// LGE_CHANGE_S : 2012.07.26 sungmin.cho@lge.com increase pmem for 720p preview. 0x1E00000 -> 0x2100000
+//#define MSM_PMEM_ADSP_SIZE      0x1E00000
+#define MSM_PMEM_ADSP_SIZE      0x2100000
+// LGE_CHANGE_E : 2012.07.26 sungmin.cho@lge.com increase pmem for 720p preview. 0x1E00000 -> 0x2100000
 #define MSM_FLUID_PMEM_ADSP_SIZE	0x2800000
 #define PMEM_KERNEL_EBI0_SIZE   0x600000
 #define MSM_PMEM_AUDIO_SIZE     0x200000
 
 #define PMIC_GPIO_INT		27
 #define PMIC_VREG_WLAN_LEVEL	2900
+#ifdef CONFIG_LGE_MMC_BRINGUP
+#define PMIC_GPIO_SD_DET	42
+#else
 #define PMIC_GPIO_SD_DET	36
+#endif
 #define PMIC_GPIO_SDC4_EN_N	17  /* PMIC GPIO Number 18 */
 #define PMIC_GPIO_HDMI_5V_EN_V3 32  /* PMIC GPIO for V3 H/W */
 #define PMIC_GPIO_HDMI_5V_EN_V2 39 /* PMIC GPIO for V2 H/W */
@@ -144,7 +157,9 @@
 #define PM8058_MPP_PM_TO_SYS(pm_gpio)	   (pm_gpio + PM8058_MPP_BASE)
 
 #define PMIC_GPIO_FLASH_BOOST_ENABLE	15	/* PMIC GPIO Number 16 */
+#ifdef CONFIG_HAPTIC_ISA1200
 #define PMIC_GPIO_HAP_ENABLE   16  /* PMIC GPIO Number 17 */
+#endif
 
 #define PMIC_GPIO_WLAN_EXT_POR  22 /* PMIC GPIO NUMBER 23 */
 
@@ -162,6 +177,237 @@
 static unsigned int phys_add = DDR2_BANK_BASE;
 unsigned long ebi1_phys_offset = DDR2_BANK_BASE;
 EXPORT_SYMBOL(ebi1_phys_offset);
+
+#ifdef CONFIG_LGE_UART_MODE
+extern int __init lge_get_uart_mode(void);
+static void __init lge_uart_device_init(void);
+#endif
+
+#ifdef CONFIG_LGE_HW_REVISION
+static uint32_t lge_hw_revision=0;
+#endif
+// LGE_S,[US730],Add smem ers status for crash
+
+#if defined (CONFIG_LGE_ERS)
+
+#include <linux/slab.h>
+#include "smd_private.h"
+
+/*
+ * smem_sreset_hwreset
+ * smem_sreset_flag
+ * smem_hw_reset_flag
+ * smem_sreset_onoff_flag
+*/
+static uint32_t  *smem_sreset_hwreset =  NULL;
+static uint32_t  *smem_sreset_flag = NULL;
+static uint32_t  *smem_hw_reset_flag = NULL;
+static uint32_t  *smem_sreset_onoff_flag = NULL;
+
+static char *smem_sreset_log;
+static size_t smem_sreset_log_size;
+
+static ssize_t smem_sreset_read(struct file *file, char __user *buf,
+				    size_t len, loff_t *offset)
+{
+	loff_t pos = *offset;
+	ssize_t count;
+
+	if (pos >= smem_sreset_log_size)
+		return 0;
+
+	count = min(len, (size_t)(smem_sreset_log_size - pos));
+	if (copy_to_user(buf, smem_sreset_log + pos, count))
+		return -EFAULT;
+
+	*offset += count;
+	return count;
+}
+
+static const struct file_operations smem_sreset_file_ops = {
+	.owner = THIS_MODULE,
+	.read = smem_sreset_read,
+};
+
+#if 0//def CONFIG_LGE_DLOAD_FACTORY_RESET
+static bool lge_reset_mode_dload_upgrade = false;
+
+void set_lge_reset_mode_dload_upgrade(bool flag)
+{
+	lge_reset_mode_dload_upgrade = flag;
+}
+
+bool get_lge_reset_mode_dload_upgrade(void)
+{
+	return lge_reset_mode_dload_upgrade;
+}
+EXPORT_SYMBOL(get_lge_reset_mode_dload_upgrade);
+#endif
+
+int check_smem_ers_status(void)
+{
+	struct proc_dir_entry *entry;
+
+	smem_sreset_hwreset = (uint32_t *)smem_alloc(SMEM_ID_VENDOR0, sizeof(uint64_t)*4);
+
+	if(smem_sreset_hwreset != NULL)
+	{
+		smem_sreset_flag = (uint32_t *)smem_sreset_hwreset + 2;
+		smem_hw_reset_flag = (uint32_t *)smem_sreset_hwreset + 4;
+		smem_sreset_onoff_flag = (uint32_t *)smem_sreset_hwreset + 6;
+
+		printk(KERN_INFO "smem_sreset_hwreset => addr : 0x%X, value : 0x%X\n", (int)smem_sreset_hwreset, *smem_sreset_hwreset);
+		printk(KERN_INFO "smem_sreset_flag => addr : 0x%X, value : 0x%X\n", (int)smem_sreset_flag, *smem_sreset_flag);
+		printk(KERN_INFO "smem_hw_reset_flag => addr : 0x%X, value : 0x%X\n", (int)smem_hw_reset_flag, *smem_hw_reset_flag);
+		printk(KERN_INFO "smem_sreset_onoff_flag => addr : 0x%X, value : 0x%X\n", (int)smem_sreset_onoff_flag, *smem_sreset_onoff_flag);
+
+		*smem_sreset_onoff_flag = 0;
+
+		if(*smem_hw_reset_flag == 0xBE13AC1c)
+			printk(KERN_INFO "HW reset detected!\n");
+		else if(*smem_hw_reset_flag == 0xBE13AD1d)
+			printk(KERN_INFO "HW power off detected!\n");
+
+		smem_sreset_log = kzalloc(100, GFP_KERNEL);
+		if (smem_sreset_log == NULL) {
+			printk(KERN_ERR "smem_sreset_log allocation failed \n");
+			smem_sreset_log_size = 0;
+		}
+
+		// if CP or AP crash occured, create last_kmsg_arm9 to handle exception.
+		if(*smem_sreset_hwreset == 0xDDDEADDD)
+		{
+			//1 create a file to notify unknown reset
+			printk(KERN_INFO "unknown reset detected\n");
+
+			entry = create_proc_entry("last_kmsg_arm9", S_IFREG | S_IRUGO, NULL);
+			if (!entry) {
+				printk(KERN_ERR "%s: failed to create proc entry\n", "last_kmsg_arm9");
+				if(smem_sreset_log)
+					kfree(smem_sreset_log);
+				smem_sreset_log = NULL;
+				smem_sreset_log_size = 0;
+				return 0;
+			}
+
+			if(smem_sreset_log)
+			{
+				sprintf(smem_sreset_log, "%s value : 0x%X\n", "unknown reset detected!!", *smem_sreset_hwreset);
+				smem_sreset_log_size = strlen(smem_sreset_log);
+			}
+
+			*smem_sreset_hwreset = 0;
+			*smem_sreset_flag = 0x9A559A55;
+			*smem_hw_reset_flag = 0x9A559A55;
+
+			entry->proc_fops = &smem_sreset_file_ops;
+			entry->size = smem_sreset_log_size;
+			return 1;
+
+		}
+		// check dload reset, if the old log exist do not need to creat the last_kmsg as it'll be created below
+		else if(*smem_sreset_hwreset == 0xDDDDDEAD)
+		{
+			//1 create a file to notify this is first boot
+			printk(KERN_INFO "dload reset detected\n");
+
+#if 0//def CONFIG_LGE_DLOAD_FACTORY_RESET
+			if(*smem_sreset_flag == 0xDDDDDEAD)
+			{
+				printk(KERN_INFO "Dload upgrade reset detected\n");
+				set_lge_reset_mode_dload_upgrade(true);
+			}
+			else
+			{
+				printk(KERN_INFO "Normal Dload reset detected\n");
+				set_lge_reset_mode_dload_upgrade(false);
+			}
+#endif
+
+			entry = create_proc_entry("first_bootmsg", S_IFREG | S_IRUGO, NULL);
+			if (!entry) {
+				printk(KERN_ERR "%s: failed to create proc entry\n", "first_bootmsg");
+				if(smem_sreset_log)
+					kfree(smem_sreset_log);
+				smem_sreset_log = NULL;
+				smem_sreset_log_size = 0;
+				return 0;
+			}
+
+			if(smem_sreset_log)
+			{
+				sprintf(smem_sreset_log, "%s value : 0x%X\n", "dload reset detected!!", *smem_sreset_hwreset);
+				smem_sreset_log_size = strlen(smem_sreset_log);
+			}
+
+			*smem_sreset_hwreset = 0;
+			*smem_sreset_flag = 0x9A559A55;
+			*smem_hw_reset_flag = 0x9A559A55;
+
+			entry->proc_fops = &smem_sreset_file_ops;
+			entry->size = smem_sreset_log_size;
+			return 1;
+		}
+
+		*smem_sreset_hwreset = 0;
+		*smem_sreset_flag = 0x9A559A55;
+		*smem_hw_reset_flag = 0x9A559A55;
+			
+	}
+
+	return 0;
+}
+
+#endif
+//LGE_E,[US730],Add smem ers status for crash
+
+//LGE_S,Added for pcb revision check
+#ifdef CONFIG_LGE_HW_REVISION
+static void set_lge_hw_revision(void)
+{
+	uint32_t *smem_pcb_rev_ptr = 0;
+
+	smem_pcb_rev_ptr = (uint32_t *)smem_alloc( SMEM_PCB_REV, sizeof(uint64_t));
+
+    lge_hw_revision = *smem_pcb_rev_ptr;
+
+    printk(KERN_INFO "%s lge_hw_revision => : 0x%X\n",__func__,(int)lge_hw_revision);
+}
+uint32_t get_lge_hw_revision(void)
+{
+	return lge_hw_revision;
+}
+
+EXPORT_SYMBOL(get_lge_hw_revision);
+#endif
+//LGE_E,Added for pcb revision check
+
+#if defined (CONFIG_LGE_LCD_K_CAL)
+int g_kcal[6];
+static int __init lcd_kcal_setup(char *kcal)
+{
+    int i;
+
+    for (i=0; i<6; i++) {
+        if (kcal[i*2] >= '0' && kcal[i*2] <= '9') {
+            g_kcal[i] = (kcal[i*2] - '0') * 16;
+        }
+        else if (kcal[i*2] >= 'a' && kcal[i*2] <= 'f') {
+            g_kcal[i] = ((kcal[i*2] - 'a') + 10) * 16;
+        }
+
+        if (kcal[i*2+1] >= '0' && kcal[i*2+1] <= '9') {
+            g_kcal[i] += kcal[i*2+1] - '0';
+        }
+        else if (kcal[i*2+1] >= 'a' && kcal[i*2+1] <= 'f') {
+            g_kcal[i] += kcal[i*2+1] - 'a' + 10;
+        }
+    }
+    printk(KERN_INFO "####kcal=%s, r=%x, g=%x, b=%x  sign=%x,%x,%x\n", kcal, g_kcal[0], g_kcal[1], g_kcal[2], g_kcal[3], g_kcal[4], g_kcal[5]);
+	return 1;
+}
+__setup("kcal=", lcd_kcal_setup);
+#endif  /* CONFIG_LGE_LCD_K_CAL */
 
 struct pm8xxx_gpio_init_info {
 	unsigned			gpio;
@@ -198,6 +444,7 @@ static int pm8058_gpios_init(void)
 		},
 	};
 
+#ifdef CONFIG_HAPTIC_ISA1200
 	struct pm8xxx_gpio_init_info haptics_enable = {
 		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
 		{
@@ -211,6 +458,7 @@ static int pm8058_gpios_init(void)
 			.output_value   = 0,
 		},
 	};
+#endif
 
 	struct pm8xxx_gpio_init_info hdmi_5V_en = {
 		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HDMI_5V_EN_V3),
@@ -251,6 +499,10 @@ static int pm8058_gpios_init(void)
 	};
 
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+#ifdef CONFIG_LGE_MMC_BRINGUP
+	gpio_tlmm_config(GPIO_CFG(PMIC_GPIO_SD_DET, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	printk("%s: gpio_get_value(PMIC_GPIO_SD_DET) returns %d\n", __func__, gpio_get_value(PMIC_GPIO_SD_DET));
+#else
 	struct pm8xxx_gpio_init_info sdcc_det = {
 		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1),
 		{
@@ -270,6 +522,7 @@ static int pm8058_gpios_init(void)
 		pr_err("%s PMIC_GPIO_SD_DET config failed\n", __func__);
 		return rc;
 	}
+#endif /*CONFIG_LGE_MMC_BRINGUP*/
 #endif
 
 	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa() ||
@@ -294,6 +547,7 @@ static int pm8058_gpios_init(void)
 	}
 
 	if (machine_is_msm7x30_fluid()) {
+#ifdef CONFIG_HAPTIC_ISA1200
 		/* Haptics gpio */
 		rc = pm8xxx_gpio_config(haptics_enable.gpio,
 						&haptics_enable.config);
@@ -302,6 +556,7 @@ static int pm8058_gpios_init(void)
 							haptics_enable.gpio);
 			return rc;
 		}
+#endif
 		/* Flash boost gpio */
 		rc = pm8xxx_gpio_config(flash_boost_enable.gpio,
 						&flash_boost_enable.config);
@@ -603,6 +858,9 @@ static int pm8058_pwm_enable(struct pwm_device *pwm, int ch, int on)
 	return rc;
 }
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static const unsigned int fluid_keymap[] = {
 	KEY(0, 0, KEY_7),
 	KEY(0, 1, KEY_ENTER),
@@ -764,12 +1022,16 @@ static struct pm8xxx_keypad_platform_data fluid_keypad_data = {
 	.wakeup			= 1,
 	.keymap_data		= &fluid_keymap_data,
 };
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 static struct pm8058_pwm_pdata pm8058_pwm_data = {
 	.config         = pm8058_pwm_config,
 	.enable         = pm8058_pwm_enable,
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct pmic8058_led pmic8058_ffa_leds[] = {
 	[0] = {
 		.name		= "keyboard-backlight",
@@ -783,6 +1045,16 @@ static struct pmic8058_leds_platform_data pm8058_ffa_leds_data = {
 	.leds	= pmic8058_ffa_leds,
 };
 
+// matthew.choi@lge.com Touchkeypad Backlight [START]
+#ifdef CONFIG_MACH_LGE_M3S
+static struct pmic8058_led pmic8058_surf_leds[] = {
+	[0] = {
+		.name		= "button-backlight",
+		.max_brightness = 2,	//max brightness 15
+		.id		= PMIC8058_ID_LED_KB_LIGHT,
+	},
+};
+#else
 static struct pmic8058_led pmic8058_surf_leds[] = {
 	[0] = {
 		.name		= "keyboard-backlight",
@@ -799,6 +1071,61 @@ static struct pmic8058_led pmic8058_surf_leds[] = {
 		.max_brightness = 20,
 		.id		= PMIC8058_ID_LED_2,
 	},
+};
+#endif
+// matthew.choi@lge.com Touchkeypad Backlight [END]
+
+//20110721 hyeongwoo.seo@lge.com Add PMIC Vib Driver [START]
+#if defined(CONFIG_PMIC8058_VIBRATOR)
+static struct pmic8058_vibrator_pdata pmic_vib_pdata = {
+	.initial_vibrate_ms  = 500,
+	.level_mV = 3000,
+	.max_timeout_ms = 15000,
+};
+#endif
+//20110721 hyeongwoo.seo@lge.com[END]
+
+
+static struct mfd_cell pm8058_subdevs[] = {
+	{	.name = "pm8058-keypad",
+		.id		= -1,
+		.num_resources	= ARRAY_SIZE(resources_keypad),
+		.resources	= resources_keypad,
+	},
+	{	.name = "pm8058-led",
+		.id		= -1,
+	},
+	{	.name = "pm8058-gpio",
+		.id		= -1,
+		.platform_data	= &pm8058_gpio_data,
+		.data_size	= sizeof(pm8058_gpio_data),
+	},
+	{	.name = "pm8058-mpp",
+		.id		= -1,
+		.platform_data	= &pm8058_mpp_data,
+		.data_size	= sizeof(pm8058_mpp_data),
+	},
+	{	.name = "pm8058-pwm",
+		.id		= -1,
+		.platform_data	= &pm8058_pwm_data,
+		.data_size	= sizeof(pm8058_pwm_data),
+	},
+	{	.name = "pm8058-nfc",
+		.id		= -1,
+	},
+	{	.name = "pm8058-upl",
+		.id		= -1,
+	},
+//20110721 hyeongwoo.seo@lge.com Add PMIC Vib Driver [START]
+#if defined(CONFIG_PMIC8058_VIBRATOR)
+	{
+		.name = "pm8058-vib",
+		.id = -1,
+		.platform_data = &pmic_vib_pdata,
+		.data_size	   = sizeof(pmic_vib_pdata),
+	},
+#endif
+//20110721 hyeongwoo.seo@lge.com[END]
 };
 
 static struct pmic8058_leds_platform_data pm8058_surf_leds_data = {
@@ -828,6 +1155,7 @@ static struct pmic8058_leds_platform_data pm8058_fluid_leds_data = {
 	.num_leds = ARRAY_SIZE(pmic8058_fluid_leds),
 	.leds	= pmic8058_fluid_leds,
 };
+#endif
 
 static struct pm8xxx_irq_platform_data pm8xxx_irq_pdata = {
 	.irq_base		= PMIC8058_IRQ_BASE,
@@ -917,6 +1245,11 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 
 #ifdef CONFIG_MSM_CAMERA
 #define	CAM_STNDBY	143
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) ÀÓ½Ã·Î ¸·À½
+#ifdef CONFIG_MACH_MSM7630_U0
+//remove
+#else
+//original
 static uint32_t camera_off_vcm_gpio_table[] = {
 GPIO_CFG(1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VCM */
 };
@@ -1032,6 +1365,8 @@ static void config_camera_off_gpios(void)
 	}
 }
 
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+#ifndef CONFIG_MACH_LGE
 struct resource msm_camera_resources[] = {
 	{
 		.start	= 0xA6000000,
@@ -1059,7 +1394,10 @@ struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioclk.mclk_clk_rate = 24000000,
 	.ioclk.vfe_clk_rate  = 147456000,
 };
+#endif
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
 
+#ifndef CONFIG_MACH_LGE
 static struct msm_camera_sensor_flash_src msm_flash_src_pwm = {
 	.flash_sr_type = MSM_CAMERA_FLASH_SRC_PWM,
 	._fsrc.pwm_src.freq  = 1000,
@@ -1068,6 +1406,10 @@ static struct msm_camera_sensor_flash_src msm_flash_src_pwm = {
 	._fsrc.pwm_src.high_load = 100,
 	._fsrc.pwm_src.channel = 7,
 };
+#endif /*CONFIG_MACH_LGE_M3S*/
+#endif
+//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) ÀÓ½Ã·Î ¸·À½
+
 
 #ifdef CONFIG_MT9D112
 static struct msm_camera_sensor_flash_data flash_mt9d112 = {
@@ -1324,6 +1666,9 @@ static struct platform_device msm_gemini_device = {
 };
 #endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 #ifdef CONFIG_MSM_VPE
 static struct resource msm_vpe_resources[] = {
 	{
@@ -1344,6 +1689,7 @@ static struct platform_device msm_vpe_device = {
        .num_resources = ARRAY_SIZE(msm_vpe_resources),
        .resource = msm_vpe_resources,
 };
+#endif
 #endif
 
 #endif /*CONFIG_MSM_CAMERA*/
@@ -1417,7 +1763,7 @@ void msm_snddev_poweramp_off(void)
 }
 
 static struct regulator_bulk_data snddev_regs[] = {
-	{ .supply = "gp4", .min_uV = 2600000, .max_uV = 2600000 },
+	//{ .supply = "gp4", .min_uV = 2600000, .max_uV = 2600000 },   //minyoung1.kim@lge.com delete
 	{ .supply = "ncp", .min_uV = 1800000, .max_uV = 1800000 },
 };
 
@@ -1624,10 +1970,14 @@ static int __init buses_init(void)
 		pr_err("%s: gpio_tlmm_config (gpio=%d) failed\n",
 		       __func__, PMIC_GPIO_INT);
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	if (machine_is_msm8x60_fluid())
 		pm8058_7x30_data.keypad_pdata = &fluid_keypad_data;
 	else
 		pm8058_7x30_data.keypad_pdata = &surf_keypad_data;
+#endif
 
 	return 0;
 }
@@ -2636,6 +2986,9 @@ static struct platform_device msm_device_adspdec = {
 	},
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct resource smc91x_resources[] = {
 	[0] = {
 		.start = 0x8A000300,
@@ -2685,6 +3038,7 @@ static struct platform_device smsc911x_device = {
 		.platform_data = &smsc911x_config,
 	},
 };
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 static struct msm_gpio smsc911x_gpios[] = {
     { GPIO_CFG(172, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr6" },
@@ -2706,6 +3060,100 @@ static void msm7x30_cfg_smsc911x(void)
 	if (rc)
 		pr_err("%s: unable to enable gpios\n", __func__);
 }
+
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+extern int user_diag_enable;
+int get_usb_lock(void)
+{
+	extern int lg_get_usb_lock_state(void);
+
+	if (lg_get_usb_lock_state())
+		user_diag_enable = 0;
+	else
+		user_diag_enable = 1;
+
+	return user_diag_enable;
+};
+
+void set_usb_lock(int lock)
+{
+	extern int lg_set_usb_lock_state(int lock);
+
+	lg_set_usb_lock_state(lock);
+
+	if (lock)
+		user_diag_enable = 0;
+	else
+		user_diag_enable = 1;
+}
+
+void get_spc_code(char * spc_code)
+{
+	extern void lg_get_spc_code(char * spc_code);
+	lg_get_spc_code(spc_code);
+
+	return;
+
+}
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
+
+/* LGE_CHANGE_S [START] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */ 
+#ifdef CONFIG_LGE_DIAG_USB_PERMANENT_LOCK
+int get_usb_unlock_fail_cnt(void)
+{
+	extern int lg_get_usb_unlock_fail_cnt(void);
+
+	return (int)(lg_get_usb_unlock_fail_cnt());
+};
+
+void set_usb_unlock_fail_cnt(int cnt)
+{
+	extern int lg_set_usb_unlock_fail_cnt(int cnt);
+
+	lg_set_usb_unlock_fail_cnt(cnt);
+
+	return;
+}
+#endif
+
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION
+extern char nv_usb_lock_key[20];
+
+void get_usb_lock_key(char* usb_lock_key)
+{
+	extern void lg_get_usb_lock_key(char* usb_lock_key);
+
+	lg_get_usb_lock_key(usb_lock_key);
+	memcpy(nv_usb_lock_key, usb_lock_key, 20);
+
+	return;
+}
+
+void set_usb_lock_key(char* usb_lock_key, int length)
+{
+	extern void lg_set_usb_lock_key(char* usb_lock_key, int length);
+	
+	lg_set_usb_lock_key(usb_lock_key, length);
+	memcpy(nv_usb_lock_key, usb_lock_key, length);
+	return;
+}
+
+#endif
+#ifdef CONFIG_LGE_DIAG_USBLOCK_EFS_SYNC
+int get_usblock_efs_sync_result(void)
+{
+	extern int lg_get_usblock_efs_sync_result(void);
+
+	if (lg_get_usblock_efs_sync_result())
+		return 1;
+	else
+		return 0;
+};
+#endif   
+/* LGE_CHANGE_S [END] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */
+
 
 #ifdef CONFIG_USB_G_ANDROID
 static struct android_usb_platform_data android_usb_pdata = {
@@ -3029,6 +3477,9 @@ static struct msm_pm_boot_platform_data msm_pm_boot_pdata __initdata = {
 	.v_addr = (uint32_t *)PAGE_OFFSET,
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct resource qsd_spi_resources[] = {
 	{
 		.name   = "spi_irq_in",
@@ -3163,6 +3614,7 @@ static void __init msm_qsd_spi_init(void)
 {
 	qsd_device_spi.dev.platform_data = &qsd_spi_pdata;
 }
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 #ifdef CONFIG_USB_EHCI_MSM_72K
 static void msm_hsusb_vbus_power(unsigned phy_info, int on)
@@ -3365,6 +3817,9 @@ static struct platform_device android_pmem_device = {
 	.dev = { .platform_data = &android_pmem_pdata },
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 #ifndef CONFIG_SPI_QSD
 static int lcdc_gpio_array_num[] = {
 				45, /* spi_clk */
@@ -3408,12 +3863,16 @@ static struct platform_device lcdc_sharp_panel_device = {
 		.platform_data = &lcdc_sharp_panel_data,
 	}
 };
+#endif
 
 static struct msm_gpio dtv_panel_irq_gpios[] = {
 	{ GPIO_CFG(18, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
 		"hdmi_int" },
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct msm_gpio dtv_panel_gpios[] = {
 	{ GPIO_CFG(120, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_mclk" },
 	{ GPIO_CFG(121, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_sd0" },
@@ -3454,6 +3913,7 @@ static struct msm_gpio dtv_panel_gpios[] = {
 static unsigned dtv_reset_gpio =
 	GPIO_CFG(37, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 #endif
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 static struct regulator_bulk_data hdmi_core_regs[] = {
 	{ .supply = "ldo8",  .min_uV = 1800000, .max_uV = 1800000 },
@@ -3714,6 +4174,9 @@ static bool hdmi_check_hdcp_hw_support(void)
 		return true;
 }
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static int dtv_panel_power(int on)
 {
 	int flag_on = !!on;
@@ -3774,6 +4237,7 @@ static int dtv_panel_power(int on)
 static struct lcdc_platform_data dtv_pdata = {
 	.lcdc_power_save   = dtv_panel_power,
 };
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
        .inject_rx_on_wakeup = 1,
@@ -3976,6 +4440,9 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static int mddi_toshiba_pmic_bl(int level)
 {
 	int ret = -EPERM;
@@ -3999,7 +4466,11 @@ static struct platform_device mddi_toshiba_device = {
 		.platform_data = &mddi_toshiba_pdata,
 	}
 };
+#endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static unsigned wega_reset_gpio =
 	GPIO_CFG(180, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
@@ -4360,7 +4831,6 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mdp_core_clk_table = mdp_core_clk_rate_table,
 	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
 	.mdp_rev = MDP_REV_40,
-	.mem_hid = MEMTYPE_EBI0,
 };
 
 static int lcd_panel_spi_gpio_num[] = {
@@ -4524,6 +4994,7 @@ static int lcdc_panel_power(int on)
 static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_power_save   = lcdc_panel_power,
 };
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 static struct regulator *atv_s4, *atv_ldo9;
 
@@ -4558,6 +5029,9 @@ bail:
 	return rc;
 }
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static int atv_dac_power(int on)
 {
 	int rc = 0;
@@ -4596,7 +5070,11 @@ static struct tvenc_platform_data atv_pdata = {
 	.poll		 = 1,
 	.pm_vid_en	 = atv_dac_power,
 };
+#endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static void __init msm_fb_add_devices(void)
 {
 	msm_fb_register_device("mdp", &mdp_pdata);
@@ -4608,7 +5086,11 @@ static void __init msm_fb_add_devices(void)
 	msm_fb_register_device("tvout_device", NULL);
 #endif
 }
+#endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct msm_panel_common_pdata lcdc_toshiba_panel_data = {
 	.gpio_num          = lcd_panel_spi_gpio_num,
 };
@@ -4620,6 +5102,7 @@ static struct platform_device lcdc_toshiba_panel_device = {
 		.platform_data = &lcdc_toshiba_panel_data,
 	}
 };
+#endif
 
 #if defined(CONFIG_MARIMBA_CORE) && \
    (defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
@@ -4635,6 +5118,29 @@ enum {
 	BT_TX,
 };
 
+#ifdef CONFIG_LGE_BT_DEVICE
+static struct msm_gpio bt_config_power_on[] = {
+	{ GPIO_CFG(135, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
+		"UART1DM_RFR" },
+	{ GPIO_CFG(134, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
+		"UART1DM_CTS" },
+	{ GPIO_CFG(137, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
+		"UART1DM_Rx" },
+	{ GPIO_CFG(136, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
+		"UART1DM_Tx" }
+};
+
+static struct msm_gpio bt_config_power_off[] = {
+	{ GPIO_CFG(135, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
+		"UART1DM_RFR" },
+	{ GPIO_CFG(134, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
+		"UART1DM_CTS" },
+	{ GPIO_CFG(137, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
+		"UART1DM_Rx" },
+	{ GPIO_CFG(136, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
+		"UART1DM_Tx" }
+};
+#else
 static struct msm_gpio bt_config_power_on[] = {
 	{ GPIO_CFG(134, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_RFR" },
@@ -4656,6 +5162,7 @@ static struct msm_gpio bt_config_power_off[] = {
 	{ GPIO_CFG(137, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
 		"UART1DM_Tx" }
 };
+#endif
 
 static u8 bahama_version;
 
@@ -5108,6 +5615,16 @@ static struct platform_device msm_batt_device = {
 	.dev.platform_data  = &msm_psy_batt_data,
 };
 
+/*LGE_S,[US730]08/02/12,Add button LED function*/
+#ifdef CONFIG_LEDS_MSM_PMIC
+/* LED platform data */
+static struct platform_device msm_device_pmic_leds = {
+	.name = "pmic-leds",
+	.id = -1,
+};
+#endif
+/*LGE_E,[US730]08/02/12,Add button LED function*/
+
 static char *msm_adc_fluid_device_names[] = {
 	"LTC_ADC1",
 	"LTC_ADC2",
@@ -5128,7 +5645,8 @@ static struct platform_device msm_adc_device = {
 	},
 };
 
-#ifdef CONFIG_MSM_SDIO_AL
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) flash gpio
+#if 0 //def CONFIG_MSM_SDIO_AL
 static struct msm_gpio mdm2ap_status = {
 	GPIO_CFG(77, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	"mdm2ap_status"
@@ -5169,10 +5687,45 @@ struct platform_device msm_device_sdio_al = {
 };
 
 #endif /* CONFIG_MSM_SDIO_AL */
+//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) flash gpio
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
+/* hyoill.leem diagcmd device register */
+struct diagcmd_platform_data {
+	const char *name;
+};
+
+static struct diagcmd_platform_data lg_fw_diagcmd_pdata = {
+	.name = "lg_fw_diagcmd",
+};
+
+static struct platform_device lg_fw_diagcmd_device = {
+	.name = "lg_fw_diagcmd",
+	.id = -1,
+	.dev    = {
+		.platform_data = &lg_fw_diagcmd_pdata
+	},
+};
+
+static struct platform_device lg_diag_cmd_device = {
+	.name = "lg_diag_cmd",
+	.id = -1,
+	.dev    = {
+		.platform_data = 0, //&lg_diag_cmd_pdata
+	},
+};
+
+static struct platform_device us730_testmode_device = {
+	.name   = "testmode",
+};
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
 
 static struct platform_device *devices[] __initdata = {
 #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
+#ifdef CONFIG_LGE_UART_MODE
+	// move uart device to be controlled by kernel command line
+#else
 	&msm_device_uart2,
+#endif
 #endif
 #ifdef CONFIG_MSM_PROC_COMM_REGULATOR
 	&msm_proccomm_regulator_dev,
@@ -5187,9 +5740,13 @@ static struct platform_device *devices[] __initdata = {
 #endif
 	&msm_device_smd,
 	&msm_device_dmov,
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	&smc91x_device,
 	&smsc911x_device,
 	&msm_device_nand,
+#endif
 #ifdef CONFIG_USB_MSM_OTG_72K
 	&msm_device_otg,
 #ifdef CONFIG_USB_GADGET
@@ -5199,7 +5756,11 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_USB_G_ANDROID
 	&android_usb_device,
 #endif
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	&qsd_device_spi,
+#endif
 
 #ifdef CONFIG_MSM_SSBI
 	&msm_device_ssbi_pmic1,
@@ -5210,12 +5771,20 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_device,
 	&msm_fb_device,
 	&msm_migrate_pages_device,
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	&mddi_toshiba_device,
 	&lcdc_toshiba_panel_device,
+#endif
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	&lcdc_sharp_panel_device,
+#endif
 	&android_pmem_adsp_device,
 	&android_pmem_audio_device,
 	&msm_device_i2c,
@@ -5264,16 +5833,21 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
 #endif
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 #ifdef CONFIG_MSM_VPE
 	&msm_vpe_device,
+#endif
 #endif
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 	&msm_device_tsif,
 #endif
-#ifdef CONFIG_MSM_SDIO_AL
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) flash gpio
+#if 0// def CONFIG_MSM_SDIO_AL
 	&msm_device_sdio_al,
 #endif
-
+//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com) flash gpio
 #if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
 		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE)
 	&qcrypto_device,
@@ -5285,11 +5859,35 @@ static struct platform_device *devices[] __initdata = {
 #endif
 
 	&msm_batt_device,
+/*LGE_S,[US730]08/02/12,Add button LED function*/
+#ifdef CONFIG_LEDS_MSM_PMIC
+	&msm_device_pmic_leds,
+#endif
+/*LGE_E,[US730]08/02/12,Add button LED function*/
 	&msm_adc_device,
 	&msm_ebi0_thermal,
 	&msm_ebi1_thermal
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
+/* hyoill.leem diagcmd device register */
+	,&lg_fw_diagcmd_device
+	,&lg_diag_cmd_device
+/* hyoill.leem diagcmd device register */
+// matthew.cho@lge.com 111025 for testmode device files (ex. hw_version ..)
+	,&us730_testmode_device
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
 };
 
+#ifdef CONFIG_LGE_AUDIO
+static struct msm_gpio msm_i2c_gpios_hw[] = {
+	{ GPIO_CFG(78, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
+	{ GPIO_CFG(79, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
+};
+
+static struct msm_gpio msm_i2c_gpios_io[] = {
+	{ GPIO_CFG(78, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
+	{ GPIO_CFG(79, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
+};
+#else
 static struct msm_gpio msm_i2c_gpios_hw[] = {
 	{ GPIO_CFG(70, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
 	{ GPIO_CFG(71, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
@@ -5299,6 +5897,7 @@ static struct msm_gpio msm_i2c_gpios_io[] = {
 	{ GPIO_CFG(70, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
 	{ GPIO_CFG(71, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
 };
+#endif
 
 static struct msm_gpio qup_i2c_gpios_io[] = {
 	{ GPIO_CFG(16, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "qup_scl" },
@@ -5356,8 +5955,13 @@ qup_i2c_gpio_config(int adap_id, int config_type)
 
 static struct msm_i2c_platform_data msm_i2c_pdata = {
 	.clk_freq = 100000,
+#ifdef CONFIG_LGE_AUDIO
+	.pri_clk = 78,   //.pri_clk = 70,
+	.pri_dat = 79,  //.pri_dat = 71,
+#else
 	.pri_clk = 70,
 	.pri_dat = 71,
+#endif
 	.rmutex  = 1,
 	.rsl_id = "D:I2C02000021",
 	.msm_i2c_config_gpio = msm_i2c_gpio_config,
@@ -5417,10 +6021,14 @@ static void __init msm7x30_init_irq(void)
 	msm_init_irq();
 }
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
 	{GPIO_CFG(86, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_cs1"},
 	{GPIO_CFG(115, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_busy1"},
 };
+#endif
 
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
@@ -6013,20 +6621,30 @@ out:
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
+#ifdef CONFIG_LGE_MMC_BRINGUP
+	printk("%s(PMIC_GPIO_SD_DET) returns %d\n",__func__, gpio_get_value(PMIC_GPIO_SD_DET));
+	return (unsigned int) gpio_get_value(PMIC_GPIO_SD_DET)?0:1;
+#else
 	return (unsigned int)
 		gpio_get_value_cansleep(
 			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1));
+#endif
 }
 #endif
 
 static int msm_sdcc_get_wpswitch(struct device *dv)
 {
+// WP is not used, comment out
+#ifdef CONFIG_LGE_MMC_BRINGUP
+	return -1;
+#else
 	void __iomem *wp_addr = 0;
 	uint32_t ret = 0;
 	struct platform_device *pdev;
-
-	if (!(machine_is_msm7x30_surf()))
-		return -1;
+//LGE_CHANGE_S
+//	if (!(machine_is_msm7x30_surf()))
+//		return -1;
+//LGE_CHANGE_S   
 	pdev = container_of(dv, struct platform_device, dev);
 
 	wp_addr = ioremap(FPGA_SDCC_STATUS, 4);
@@ -6041,6 +6659,7 @@ static int msm_sdcc_get_wpswitch(struct device *dv)
 	iounmap(wp_addr);
 
 	return ret;
+#endif
 }
 #endif
 
@@ -6108,7 +6727,11 @@ static struct mmc_platform_data msm7x30_sdc4_data = {
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7x30_sdcc_slot_status,
+#ifdef CONFIG_LGE_MMC_BRINGUP
+	.status_irq  = MSM_GPIO_TO_INT(PMIC_GPIO_SD_DET),
+#else
 	.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET - 1),
+#endif
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
 	.wpswitch    = msm_sdcc_get_wpswitch,
@@ -6249,8 +6872,13 @@ out2:
 out3:
 #endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+#ifdef CONFIG_LGE_MMC_BRINGUP
+	if (mmc_regulator_init(4, "ldo10", 2850000))
+		return;
+#else
 	if (mmc_regulator_init(4, "mmc", 2850000))
 		return;
+#endif
 	msm7x30_sdc4_data.swfi_latency = msm7x30_power_collapse_latency(
 		MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT);
 
@@ -6259,6 +6887,9 @@ out3:
 
 }
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static void __init msm7x30_init_nand(void)
 {
 	char *build_id;
@@ -6279,6 +6910,7 @@ static void __init msm7x30_init_nand(void)
 			__func__);
 	}
 }
+#endif
 
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 static struct msm_gpio uart2_config_data[] = {
@@ -6320,6 +6952,8 @@ static struct msm_tsif_platform_data tsif_platform_data = {
 #endif /* defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE) */
 /* TSIF end   */
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#else
 static void __init pmic8058_leds_init(void)
 {
 	if (machine_is_msm7x30_surf())
@@ -6329,6 +6963,7 @@ static void __init pmic8058_leds_init(void)
 	else if (machine_is_msm7x30_fluid())
 		pm8058_7x30_data.leds_pdata = &pm8058_fluid_leds_data;
 }
+#endif
 
 static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.reg_base_addr = MSM_SAW_BASE,
@@ -6484,6 +7119,7 @@ static struct i2c_board_info tsc_i2c_board_info[] = {
 };
 #endif
 
+#ifdef CONFIG_HAPTIC_ISA1200
 static struct regulator_bulk_data regs_isa1200[] = {
 	{ .supply = "gp7",  .min_uV = 1800000, .max_uV = 1800000 },
 	{ .supply = "gp10", .min_uV = 2600000, .max_uV = 2600000 },
@@ -6600,7 +7236,11 @@ static struct i2c_board_info msm_isa1200_board_info[] = {
 	},
 };
 
+#endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 static int kp_flip_mpp_config(void)
 {
 	struct pm8xxx_mpp_config_data kp_flip_mpp = {
@@ -6630,6 +7270,7 @@ static struct platform_device flip_switch_device = {
 		.platform_data = &flip_switch_data,
 	}
 };
+#endif
 
 static struct regulator_bulk_data regs_tma300[] = {
 	{ .supply = "gp6", .min_uV = 3050000, .max_uV = 3100000 },
@@ -6765,7 +7406,12 @@ static void __init msm7x30_init(void)
 
 	msm_clock_init(&msm7x30_clock_init_data);
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
+#ifdef CONFIG_LGE_UART_MODE
+	if(lge_get_uart_mode())
+		msm7x30_init_uart2();
+#else
 	msm7x30_init_uart2();
+#endif
 #endif
 	msm_spm_init(&msm_spm_data, 1);
 	acpuclk_init(&acpuclk_7x30_soc_data);
@@ -6800,7 +7446,24 @@ static void __init msm7x30_init(void)
 		msm_adc_pdata.num_adc = ARRAY_SIZE(msm_adc_surf_device_names);
 	}
 
+#ifdef CONFIG_LGE_RAM_CONSOLE
+	lge_add_ramconsole_devices();
+#endif
+
+#ifdef CONFIG_LGE_ERS
+	lge_add_ers_devices();
+	lge_add_panic_handler_devices();
+#endif
+/* LGE_CHANGE_S [START] 2012.2.22 jaeho.cho@lge.com add lg usb platform device */
+#if defined (CONFIG_USB_G_LGE_ANDROID) && defined (CONFIG_LGE_PM)
+	lge_add_usb_devices();
+#endif
+/* LGE_CHANGE_S [END] 2012.2.22 jaeho.cho@lge.com add lg usb platform device */
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	pmic8058_leds_init();
+#endif
 
 	buses_init();
 
@@ -6811,11 +7474,20 @@ static void __init msm7x30_init(void)
 
 	platform_add_devices(msm_footswitch_devices,
 			     msm_num_footswitch_devices);
+
+#ifdef CONFIG_LGE_UART_MODE
+	lge_uart_device_init();
+#endif
+
 	platform_add_devices(devices, ARRAY_SIZE(devices));
+
 #ifdef CONFIG_USB_EHCI_MSM_72K
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
 	msm7x30_init_mmc();
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	msm7x30_init_nand();
 	msm_qsd_spi_init();
 
@@ -6827,11 +7499,22 @@ static void __init msm7x30_init(void)
 		spi_register_board_info(lcdc_toshiba_spi_board_info,
 			ARRAY_SIZE(lcdc_toshiba_spi_board_info));
 #endif
+#endif /*CONFIG_LGE_REMOVE_UNNECESSARINESS*/
 
 	atv_dac_power_init();
-	sensors_ldo_init();
+
+/* LGE_CHANGE_START [2012-02-07]*/
+/* sensors_ldo_init() is the function that to set ldo config for bma150 and those serise.*/
+/* for U0(US730), these setting is unneccesay because of hardware config*/
+/*								*/
+/*	sensors_ldo_init();*/
+
 	hdmi_init_regs();
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 	msm_fb_add_devices();
+#endif
 	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
 	BUG_ON(msm_pm_boot_init(&msm_pm_boot_pdata));
 	msm_device_i2c_init();
@@ -6859,11 +7542,21 @@ static void __init msm7x30_init(void)
 					ARRAY_SIZE(bma150_board_info));
 #endif
 
+//QCT workaround code : BT -> QTR to QTR -> BT
+//new
+	i2c_register_board_info(2, msm_i2c_gsbi7_timpani_info,
+			ARRAY_SIZE(msm_i2c_gsbi7_timpani_info));
+
+	i2c_register_board_info(2, msm_marimba_board_info,
+			ARRAY_SIZE(msm_marimba_board_info));
+//original
+/*
 	i2c_register_board_info(2, msm_marimba_board_info,
 			ARRAY_SIZE(msm_marimba_board_info));
 
 	i2c_register_board_info(2, msm_i2c_gsbi7_timpani_info,
 			ARRAY_SIZE(msm_i2c_gsbi7_timpani_info));
+*/
 
 	i2c_register_board_info(4 /* QUP ID */, msm_camera_boardinfo,
 				ARRAY_SIZE(msm_camera_boardinfo));
@@ -6872,9 +7565,11 @@ static void __init msm7x30_init(void)
 #ifdef CONFIG_I2C_SSBI
 	msm_device_ssbi7.dev.platform_data = &msm_i2c_ssbi7_pdata;
 #endif
+#ifdef CONFIG_HAPTIC_ISA1200
 	if (machine_is_msm7x30_fluid())
 		i2c_register_board_info(0, msm_isa1200_board_info,
 			ARRAY_SIZE(msm_isa1200_board_info));
+#endif
 
 #if defined(CONFIG_TOUCHSCREEN_TSC2007) || \
 	defined(CONFIG_TOUCHSCREEN_TSC2007_MODULE)
@@ -6883,8 +7578,13 @@ static void __init msm7x30_init(void)
 				ARRAY_SIZE(tsc_i2c_board_info));
 #endif
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	// remove unnecessary drivers
+#else
 	if (machine_is_msm7x30_surf())
 		platform_device_register(&flip_switch_device);
+#endif
+
 
 	pm8058_gpios_init();
 
@@ -6906,9 +7606,42 @@ static void __init msm7x30_init(void)
 				__func__, usb_hub_gpio_cfg_value, rc);
 	}
 
+#if defined (CONFIG_MACH_LGE)
+    lge_add_lcd_devices();
+#endif
+#if defined(CONFIG_LGE_AUDIO)
+	 lge_m3s_audio_init();
+#endif
+
+#ifdef CONFIG_MACH_LGE
+    lge_add_input_devices();
+
+//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+	lge_add_camera_devices();
+//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
+
+	/* gpio i2c devices should be registered at latest point */
+	lge_add_gpio_i2c_devices();
+#endif
+
+// matthew.choi@lge.com 111026 add virtual keyboard for at cmd [START]
+	lge_add_atcmd_virtual_kbd_device();
+// matthew.choi@lge.com 111026 add virtual keyboard for at cmd [END]
+
 	boot_reason = *(unsigned int *)
 		(smem_get_entry(SMEM_POWER_ON_STATUS_INFO, &smem_size));
 	printk(KERN_NOTICE "Boot Reason = 0x%02x\n", boot_reason);
+
+// LGE_S,[US730],Add smem ers status for crash
+#if defined (CONFIG_LGE_ERS)
+	check_smem_ers_status();
+#endif
+// LGE_E,[US730],Add smem ers status for crash
+//LGE_S,Added for pcb revision check
+#ifdef CONFIG_LGE_HW_REVISION
+	set_lge_hw_revision();
+#endif
+//LGE_E,Added for pcb revision check
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
@@ -6919,7 +7652,7 @@ static int __init pmem_sf_size_setup(char *p)
 }
 early_param("pmem_sf_size", pmem_sf_size_setup);
 
-static unsigned fb_size;
+static unsigned fb_size = MSM_FB_SIZE;
 static int __init fb_size_setup(char *p)
 {
 	fb_size = memparse(p, NULL);
@@ -7000,17 +7733,10 @@ static void __init reserve_pmem_memory(void)
 #endif
 }
 
-static void __init reserve_mdp_memory(void)
-{
-	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
-	msm7x30_reserve_table[mdp_pdata.mem_hid].size += mdp_pdata.ov0_wb_size;
-}
-
 static void __init msm7x30_calculate_reserve_sizes(void)
 {
 	size_pmem_devices();
 	reserve_pmem_memory();
-	reserve_mdp_memory();
 }
 
 static int msm7x30_paddr_to_memtype(unsigned int paddr)
@@ -7064,6 +7790,15 @@ static void __init msm7x30_init_early(void)
 static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
+/*
+ * The base address of EBI1_CS0 in MSM7X30 is 0X40000000.
+ * 0X20000000 might be used as EBI0_CS1.
+ * With MSM7X30 Light, EBI1_CS0 will be fixed on 0X20000000.
+ */
+#if defined(CONFIG_MACH_LGE)
+    ebi1_phys_offset = DDR2_BANK_BASE;
+    phys_add = DDR2_BANK_BASE;
+#else
 	for (; tags->hdr.size; tags = tag_next(tags)) {
 		if (tags->hdr.tag == ATAG_MEM && tags->u.mem.start ==
 							DDR1_BANK_BASE) {
@@ -7072,8 +7807,39 @@ static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
 				break;
 		}
 	}
+#endif
 }
 
+#ifdef CONFIG_LGE_UART_MODE
+// move uart device to be controlled by kernel command line
+static struct platform_device *uart_devices[] __initdata = {
+	&msm_device_uart2,
+};
+
+static void __init lge_uart_device_init(void)
+{
+	if(lge_get_uart_mode())
+		platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
+}
+#endif
+
+// LGE_CHANGE_S add MSM7X30_U0 MACHINE_START
+MACHINE_START(MSM7X30_M3S, "LGE MSM7X30 M3S")
+    .boot_params = PLAT_PHYS_OFFSET + 0x100,
+    .map_io = msm7x30_map_io,
+    .reserve = msm7x30_reserve,
+    .init_irq = msm7x30_init_irq,
+    .init_machine = msm7x30_init,
+    .timer = &msm_timer,
+    .init_early = msm7x30_init_early,
+    .handle_irq = vic_handle_irq,
+	.fixup = msm7x30_fixup,
+MACHINE_END
+// LGE_CHANGE_E
+
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+// remove unnecessary drivers
+#else
 MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
 	.boot_params = PLAT_PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
@@ -7155,3 +7921,4 @@ MACHINE_START(MSM8X55_SVLTE_FFA, "QCT MSM8X55 SVLTE FFA")
 	.handle_irq = vic_handle_irq,
 	.fixup = msm7x30_fixup,
 MACHINE_END
+#endif

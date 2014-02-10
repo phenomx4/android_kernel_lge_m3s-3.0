@@ -66,3 +66,8 @@ obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_TZCOM) += tzcom.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
+# [2010-09-06],addy.kim@lge.com,register Object to compile pn544.c [START]
+obj-$(CONFIG_PN544_NFC) += pn544.o
+# [2010-09-06],addy.kim@lge.com, [END]
+obj-$(CONFIG_LGE_SUPPORT_AT_CMD) += lge_ats_at_class.o
+obj-$(CONFIG_LGE_SUPPORT_AT_CMD) += lge_ats_at.o

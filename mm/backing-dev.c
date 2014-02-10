@@ -686,6 +686,8 @@ void bdi_destroy(struct backing_dev_info *bdi)
 
 	bdi_unregister(bdi);
 
+#if defined(CONFIG_MMC)
+	/* LGE_S,[US730],SD card insert->remove->reset issue */
 	/*
 	 * If bdi_unregister() had already been called earlier, the
 	 * wakeup_timer could still be armed because bdi_prune_sb()
@@ -693,6 +695,8 @@ void bdi_destroy(struct backing_dev_info *bdi)
 	 * __mark_inode_dirty().
 	 */
 	del_timer_sync(&bdi->wb.wakeup_timer);
+	/* LGE_E,[US730],SD card insert->remove->reset issue */
+#endif //CONFIG_MMC	
 
 	for (i = 0; i < NR_BDI_STAT_ITEMS; i++)
 		percpu_counter_destroy(&bdi->bdi_stat[i]);

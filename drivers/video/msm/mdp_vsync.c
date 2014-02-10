@@ -422,6 +422,28 @@ void mdp_vsync_resync_workqueue_handler(struct work_struct *work)
 			    (struct msm_fb_panel_data *)mfd->pdev->dev.
 			    platform_data;
 
+#ifdef CONFIG_MACH_LGE
+			/*
+			 * we need to turn on MDP power if it uses MDP vsync
+			 * HW block in SW mode
+			 */
+			if ((!mfd->panel_info.lcd.hw_vsync_mode) &&
+			    (mfd->use_mdp_vsync) &&
+			    (pdata) && (pdata->set_vsync_notifier != NULL)) {
+				/*
+				 * enable pwr here since we can't enable it in
+				 * vsync callback in isr mode
+				 */
+				mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON,
+					      FALSE);
+			}
+
+			if (pdata->set_vsync_notifier != NULL) {
+				vsync_fnc_enabled = TRUE;
+				pdata->set_vsync_notifier(mdp_vsync_handler,
+							  (void *)mfd);
+			}
+#else
 			if (pdata->set_vsync_notifier != NULL) {
 				if (pdata->clk_func && !pdata->clk_func(2)) {
 					mfd->vsync_handler_pending = FALSE;
@@ -433,6 +455,7 @@ void mdp_vsync_resync_workqueue_handler(struct work_struct *work)
 						(void *)mfd);
 				vsync_fnc_enabled = TRUE;
 			}
+#endif
 		}
 	}
 

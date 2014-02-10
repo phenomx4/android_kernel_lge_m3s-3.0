@@ -1168,4 +1168,124 @@ config USB_ANDROID_RMNET_CTRL_SMD
 	 transfers. This option enables only control interface.
 	 Data interface used is BAM.
 
+# LGE_CHANGE
+# LGE android gadget config for ICS.
+# Toward simple, straightforward...
+# 2011-09-09, hyunhui.park@lge.com
+#
+config USB_G_LGE_ANDROID
+	boolean "LGE Android Gadget for LG PC host Driver"
+	depends on USB_G_ANDROID
+	help
+	  Customized Android Gadget USB framework for
+	  LGE United PC host USB driver.
+
+	default n
+
+config USB_G_LGE_ANDROID_STORAGE_NAME
+	string "USB mass & cdrom storage device name for LGE Android"
+	default "Android Platform"
+	help
+	   Name for USB mass & cdrom device name used in LGE Andoird Autorun.
+
+	   NOTE: default name is "Android Platform", need to change your
+	   board config to use other device name(e.g. in VZW devices)
+
+config USB_G_LGE_ANDROID_AUTORUN_LGE
+	boolean "LGE specific autorun support in LGE Android"
+	depends on USB_G_LGE_ANDROID_AUTORUN
+	help
+	  It supports LGE specific autorun feature. note that this
+	  must be used in LGE(with non-VZW) devices.
+
+	  Say y if this must be needed.
+
+	default n
+
+config USB_G_LGE_ANDROID_AUTORUN
+	boolean "Common autorun support in LGE Android"
+	depends on USB_G_LGE_ANDROID && LGE_USB_AUTORUN_ENABLE
+	help
+	  Autorun is LGE specific feature which is able to install PC host
+	  USB driver automatically on Autorun-enabled OS(Ex. Windows). For this,
+	  virtual-cdrom device is provided on LGE Android powered device.
+
+	default n
+#LGE_CHARGE_S [START] 2012.2.22 jaeho.cho@lge.com
+config LGE_USB_ECM
+	boolean "Support LG ndis driver"
+	depends on USB_G_ANDROID
+	help
+	  need to match lg ndis driver mac addres string index for earlier version
+          of LG united driver
+
+	default n
+#LGE_CHARGE_S [END] 2012.2.22 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.2.22 jaeho.cho@lge.com
+config LGE_PM
+	boolean "Support LG ndis driver"
+	help
+	  need to match lg ndis driver mac addres string index for earlier version
+          of LG united driver
+
+	default n
+#LGE_CHARGE_S [END] 2012.2.22 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.2.26 jaeho.cho@lge.com
+config LGE_USB_FACTORY_BELOW_MSM8X60
+	boolean "Support factory usb of the chipset below MSM8x60"
+	help
+	  this feature is made to support ICS factory usb of the chipset below MSM8X60
+
+	default n
+#LGE_CHARGE_S [END] 2012.2.26 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.3.12 jaeho.cho@lge.com
+config LGE_USB_STORE_PID
+	boolean "store USB pid that is used in bootloader"
+	help
+	  this feature is made to keep USB pid during download
+
+	default n
+#LGE_CHARGE_S [END] 2012.3.12 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.3.12 jaeho.cho@lge.com
+config LGE_SMEM
+	boolean "Add shared memory index for LGE"
+	help
+	  this feature is made to add shared memory index for LGE
+
+	default n
+#LGE_CHARGE_S [END] 2012.3.12 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.3.30 jaeho.cho@lge.com
+config LGE_USB_AUTORUN_ENABLE
+	boolean "determine usb autorun enable/disable"
+	help
+	  adjustment of autorun function is determined according to customer.
+          for example, prepaid phone customer doesn't require autorun function.
+
+	default n
+#LGE_CHARGE_S [END] 2012.3.30 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.3.30 jaeho.cho@lge.com
+config LGE_USB_CHARGE_ONLY
+	boolean "divide charge only feature from autorun"
+	help
+	  HID usb device is used for charge only mode
+
+	default n
+#LGE_CHARGE_S [END] 2012.3.30 jaeho.cho@lge.com
+#LGE_CHARGE_S [START] 2012.6.14 jaeho.cho@lge.com
+config LGE_USB_DETECT_IMPROVEMENT
+	boolean "improve usb detection when factory cable is connected"
+	help
+	  Improve usb detection when factory cable is connected
+
+	default n
+#LGE_CHARGE_S [END] 2012.6.14 jaeho.cho@lge.com
+
+config USB_G_LGE_SERIALNO_REDIRECTION
+	boolean "LGE specific serial number support in LGE Android"
+	help
+	  if ro.serialno is not available, use sys device node 
+
+	  Say y if this must be needed.
+
+	default n
 endif # USB_GADGET

@@ -119,7 +119,10 @@ struct vc {
 	   would be that vc_cons etc can no longer be static */
 };
 
+#if defined (CONFIG_VT_CONSOLE)
 extern struct vc vc_cons [MAX_NR_CONSOLES];
+#endif
+
 extern void vc_SAK(struct work_struct *work);
 
 #define CUR_DEF		0

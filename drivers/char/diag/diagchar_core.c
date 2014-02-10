@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -35,6 +35,12 @@
 #include "diagfwd_hsic.h"
 #endif
 #include <linux/timer.h>
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+#if defined (CONFIG_LGE_DIAG)
+#include <linux/platform_device.h>
+#include <mach/lge_diagcmd.h>
+#endif /*CONFIG_LGE_DIAG*/
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
@@ -48,7 +54,12 @@ struct diagchar_priv {
 };
 /* The following variables can be specified by module options */
  /* for copy buffer */
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+#if defined (CONFIG_LGE_DIAG)
 static unsigned int itemsize = 4096; /*Size of item in the mempool */
+#else /*CONFIG_LGE_DIAG*/
+#endif /*CONFIG_LGE_DIAG*/
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 static unsigned int poolsize = 10; /*Number of items in the mempool */
 /* for hdlc buffer */
 static unsigned int itemsize_hdlc = 8192; /*Size of item in the mempool */
@@ -63,9 +74,21 @@ static unsigned int threshold_client_limit = 30;
 unsigned int diag_max_reg = 600;
 unsigned int diag_threshold_reg = 750;
 
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+#if defined (CONFIG_LGE_DIAG)
+/* Timer variables */
+struct timer_list drain_timer;
+int timer_in_progress;
+
+extern void lgfw_diag_kernel_service_init(int);
+extern int lg_diag_cmd_dev_register(struct lg_diag_cmd_dev *sdev);
+extern 	void lg_diag_cmd_dev_unregister(struct lg_diag_cmd_dev *sdev);
+#else /*CONFIG_LGE_DIAG*/
 /* Timer variables */
 static struct timer_list drain_timer;
 static int timer_in_progress;
+#endif /*CONFIG_LGE_DIAG*/
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 void *buf_hdlc;
 module_param(itemsize, uint, 0);
 module_param(poolsize, uint, 0);
@@ -269,8 +292,7 @@ void diag_clear_reg(int proc_num)
 }
 
 void diag_add_reg(int j, struct bindpkt_params *params,
-					  int *success,
-					  unsigned int *count_entries)
+					  int *success, int *count_entries)
 {
 	*success = 1;
 	driver->table[j].cmd_code = params->cmd_code;
@@ -287,153 +309,82 @@ void diag_add_reg(int j, struct bindpkt_params *params,
 	(*count_entries)++;
 }
 
+#if 1
+static long diagchar_ioctl(struct file *filp,
+			   unsigned int iocmd, unsigned long ioarg)
+#else
 long diagchar_ioctl(struct file *filp,
 			   unsigned int iocmd, unsigned long ioarg)
+#endif
 {
-	int i, j, temp, success = -1;
-	unsigned int count_entries = 0, interim_count = 0;
+	int i, j, count_entries = 0, temp;
+	int success = -1;
 	void *temp_buf;
 
 	if (iocmd == DIAG_IOCTL_COMMAND_REG) {
-		struct bindpkt_params_per_process pkt_params;
-		struct bindpkt_params *params;
-		struct bindpkt_params *head_params;
-		if (copy_from_user(&pkt_params, (void *)ioarg,
-			   sizeof(struct bindpkt_params_per_process))) {
-			return -EFAULT;
-		}
-		if ((UINT32_MAX/sizeof(struct bindpkt_params)) <
-							 pkt_params.count) {
-			pr_alert("diag: integer overflow while multiply\n");
-			return -EFAULT;
-		}
-		params = kzalloc(pkt_params.count*sizeof(
-			struct bindpkt_params), GFP_KERNEL);
-		if (!params) {
-			pr_alert("diag: unable to alloc memory\n");
-			return -ENOMEM;
-		} else
-			head_params = params;
-
-		if (copy_from_user(params, pkt_params.params,
-			   pkt_params.count*sizeof(struct bindpkt_params))) {
-			kfree(head_params);
-			return -EFAULT;
-		}
+		struct bindpkt_params_per_process *pkt_params =
+			 (struct bindpkt_params_per_process *) ioarg;
 		mutex_lock(&driver->diagchar_mutex);
 		for (i = 0; i < diag_max_reg; i++) {
 			if (driver->table[i].process_id == 0) {
-				diag_add_reg(i, params, &success,
-							 &count_entries);
-				if (pkt_params.count > count_entries) {
-					params++;
+				diag_add_reg(i, pkt_params->params,
+						&success, &count_entries);
+				if (pkt_params->count > count_entries) {
+					pkt_params->params++;
 				} else {
 					mutex_unlock(&driver->diagchar_mutex);
-					kfree(head_params);
 					return success;
 				}
 			}
 		}
 		if (i < diag_threshold_reg) {
 			/* Increase table size by amount required */
-			if (pkt_params.count >= count_entries) {
-				interim_count = pkt_params.count -
+			diag_max_reg += pkt_params->count -
 							 count_entries;
-			} else {
-				pr_alert("diag: error in params count\n");
-				kfree(head_params);
-				mutex_unlock(&driver->diagchar_mutex);
-				return -EFAULT;
-			}
-			if (UINT32_MAX - diag_max_reg >=
-							interim_count) {
-				diag_max_reg += interim_count;
-			} else {
-				pr_alert("diag: Integer overflow\n");
-				kfree(head_params);
-				mutex_unlock(&driver->diagchar_mutex);
-				return -EFAULT;
-			}
 			/* Make sure size doesnt go beyond threshold */
 			if (diag_max_reg > diag_threshold_reg) {
 				diag_max_reg = diag_threshold_reg;
 				pr_info("diag: best case memory allocation\n");
 			}
-			if (UINT32_MAX/sizeof(struct diag_master_table) <
-								 diag_max_reg) {
-				pr_alert("diag: integer overflow\n");
-				kfree(head_params);
-				mutex_unlock(&driver->diagchar_mutex);
-				return -EFAULT;
-			}
 			temp_buf = krealloc(driver->table,
 					 diag_max_reg*sizeof(struct
 					 diag_master_table), GFP_KERNEL);
 			if (!temp_buf) {
-				pr_alert("diag: Insufficient memory for reg.\n");
+				diag_max_reg -= pkt_params->count -
+							 count_entries;
+				pr_alert("diag: Insufficient memory for reg.");
 				mutex_unlock(&driver->diagchar_mutex);
-
-				if (pkt_params.count >= count_entries) {
-					interim_count = pkt_params.count -
-								 count_entries;
-				} else {
-					pr_alert("diag: params count error\n");
-					mutex_unlock(&driver->diagchar_mutex);
-					kfree(head_params);
-					return -EFAULT;
-				}
-				if (diag_max_reg >= interim_count) {
-					diag_max_reg -= interim_count;
-				} else {
-					pr_alert("diag: Integer underflow\n");
-					mutex_unlock(&driver->diagchar_mutex);
-					kfree(head_params);
-					return -EFAULT;
-				}
-				kfree(head_params);
 				return 0;
 			} else {
 				driver->table = temp_buf;
 			}
 			for (j = i; j < diag_max_reg; j++) {
-				diag_add_reg(j, params, &success,
-							 &count_entries);
-				if (pkt_params.count > count_entries) {
-					params++;
+				diag_add_reg(j, pkt_params->params,
+						&success, &count_entries);
+				if (pkt_params->count > count_entries) {
+					pkt_params->params++;
 				} else {
 					mutex_unlock(&driver->diagchar_mutex);
-					kfree(head_params);
 					return success;
 				}
 			}
-			kfree(head_params);
 			mutex_unlock(&driver->diagchar_mutex);
 		} else {
 			mutex_unlock(&driver->diagchar_mutex);
-			kfree(head_params);
 			pr_err("Max size reached, Pkt Registration failed for"
 						" Process %d", current->tgid);
 		}
 		success = 0;
 	} else if (iocmd == DIAG_IOCTL_GET_DELAYED_RSP_ID) {
-		struct diagpkt_delay_params delay_params;
-		uint16_t interim_rsp_id;
-		int interim_size;
-		if (copy_from_user(&delay_params, (void *)ioarg,
-					   sizeof(struct diagpkt_delay_params)))
-			return -EFAULT;
-		if ((delay_params.rsp_ptr) &&
-		 (delay_params.size == sizeof(delayed_rsp_id)) &&
-				 (delay_params.num_bytes_ptr)) {
-			interim_rsp_id = DIAGPKT_NEXT_DELAYED_RSP_ID(
-							delayed_rsp_id);
-			if (copy_to_user((void *)delay_params.rsp_ptr,
-					 &interim_rsp_id, sizeof(uint16_t)))
-				return -EFAULT;
-			interim_size = sizeof(delayed_rsp_id);
-			if (copy_to_user((void *)delay_params.num_bytes_ptr,
-						 &interim_size, sizeof(int)))
-				return -EFAULT;
+		struct diagpkt_delay_params *delay_params =
+					(struct diagpkt_delay_params *) ioarg;
+
+		if ((delay_params->rsp_ptr) &&
+		 (delay_params->size == sizeof(delayed_rsp_id)) &&
+				 (delay_params->num_bytes_ptr)) {
+			*((uint16_t *)delay_params->rsp_ptr) =
+				DIAGPKT_NEXT_DELAYED_RSP_ID(delayed_rsp_id);
+			*(delay_params->num_bytes_ptr) = sizeof(delayed_rsp_id);
 			success = 0;
 		}
 	} else if (iocmd == DIAG_IOCTL_LSM_DEINIT) {
@@ -760,7 +711,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	struct diag_send_desc_type send = { NULL, NULL, DIAG_STATE_START, 0 };
 	struct diag_hdlc_dest_type enc = { NULL, NULL, 0 };
 	void *buf_copy = NULL;
-	unsigned int payload_size;
+	int payload_size;
 #ifdef CONFIG_DIAG_OVER_USB
 	if (((driver->logging_mode == USB_MODE) && (!driver->usb_connected)) ||
 				(driver->logging_mode == NO_LOGGING_MODE)) {
@@ -771,17 +722,8 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	/* Get the packet type F3/log/event/Pkt response */
 	err = copy_from_user((&pkt_type), buf, 4);
 	/* First 4 bytes indicate the type of payload - ignore these */
-	if (count < 4) {
-		pr_alert("diag: Client sending short data\n");
-		return -EBADMSG;
-	}
 	payload_size = count - 4;
-	if (payload_size > USER_SPACE_DATA) {
-		pr_err("diag: Dropping packet, packet payload size crosses 8KB limit. Current payload size %d\n",
-				payload_size);
-		driver->dropped_count++;
-		return -EBADMSG;
-	}
+
 	if (pkt_type == USER_SPACE_LOG_TYPE) {
 		err = copy_from_user(driver->user_space_data, buf + 4,
 							 payload_size);
@@ -1097,6 +1039,36 @@ void diag_hsic_fn(int type)
 #else
 inline void diag_hsic_fn(int type) {}
 #endif
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+#if defined (CONFIG_LGE_DIAG)
+extern int lg_diag_create_file(struct platform_device *pdev);
+extern int lg_diag_remove_file(struct platform_device *pdev);
+
+static int lg_diag_cmd_probe(struct platform_device *pdev)
+{
+	int ret;
+	ret = lg_diag_create_file(pdev);
+
+	return ret;
+}
+
+static int lg_diag_cmd_remove(struct platform_device *pdev)
+{
+	lg_diag_remove_file(pdev);
+
+	return 0;
+}
+
+static struct platform_driver lg_diag_cmd_driver = {
+	.probe		= lg_diag_cmd_probe,
+	.remove 	= lg_diag_cmd_remove,
+	.driver 	= {
+		.name = "lg_diag_cmd",
+		.owner	= THIS_MODULE,
+	},
+};
+#endif /*CONFIG_LGE_DIAG*/
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 
 static int __init diagchar_init(void)
 {
@@ -1163,6 +1135,13 @@ static int __init diagchar_init(void)
 	}
 
 	pr_info("diagchar initialized now");
+	
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+#if defined (CONFIG_LGE_DIAG)
+	platform_driver_register(&lg_diag_cmd_driver);
+	lgfw_diag_kernel_service_init((int)driver);
+#endif /*CONFIG_LGE_DIAG*/
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 	return 0;
 
 fail:

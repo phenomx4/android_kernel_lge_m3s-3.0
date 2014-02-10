@@ -65,6 +65,10 @@ struct subprocess_info {
 	int (*init)(struct subprocess_info *info, struct cred *new);
 	void (*cleanup)(struct subprocess_info *info);
 	void *data;
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	pid_t ppid; // parent pid
+	pid_t cpid; // child pid
+#endif
 };
 
 /* Allocate a subprocess_info structure */

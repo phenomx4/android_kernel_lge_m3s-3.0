@@ -971,6 +971,9 @@ struct fps_cfg {
 	uint16_t f_mult;
 	uint16_t fps_div;
 	uint32_t pict_fps_div;
+// Start LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
+	uint8_t Is_15fps;
+// End LGE_BSP_CAMERA::tao.jin@lge.com 2012-02-13  for 15fps does not working issue (MMS Recoding Size)
 };
 struct wb_info_cfg {
 	uint16_t red_gain;
@@ -1016,6 +1019,19 @@ struct sensor_init_cfg {
 	uint8_t pict_res;
 };
 
+//[QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+#define ROLLOFF_CALDATA_SIZE    (17 * 13)
+typedef struct
+{
+    unsigned short           mesh_rolloff_table_size;     // TableSize
+    uint8_t                  r_gain[ROLLOFF_CALDATA_SIZE];   // RGain
+    uint8_t                  gr_gain[ROLLOFF_CALDATA_SIZE];  // GRGain
+    uint8_t                  gb_gain[ROLLOFF_CALDATA_SIZE];  // GBGain
+    uint8_t                  b_gain[ROLLOFF_CALDATA_SIZE];   // BGain
+
+} rolloff_caldata_array_type;
+//[QCTK] CALC end keonwoo01.park@lge.com 2012-05-19 from QCT
+
 struct sensor_calib_data {
 	/* Color Related Measurements */
 	uint16_t r_over_g;
@@ -1028,6 +1044,10 @@ struct sensor_calib_data {
 	uint16_t stroke_amt;
 	uint16_t af_pos_1m;
 	uint16_t af_pos_inf;
+//[QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+	/* Shading Related Measurements */	
+	rolloff_caldata_array_type rolloff;
+//[QCTK] CALC end keonwoo01.park@lge.com 2012-05-19 from QCT
 };
 
 enum msm_sensor_resolution_t {

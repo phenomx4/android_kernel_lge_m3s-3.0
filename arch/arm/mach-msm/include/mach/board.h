@@ -56,6 +56,12 @@ struct msm_cam_expander_info {
 };
 
 struct msm_camera_device_platform_data {
+// LGE_S,Change power sequence for camera
+#if defined(CONFIG_S5K4E1) || defined(CONFIG_MT9V113)
+	int (*camera_power_on)(void);
+	int (*camera_power_off)(void);
+#endif
+// LGE_S,Change power sequence for camera
 	int (*camera_gpio_on) (void);
 	void (*camera_gpio_off)(void);
 	struct msm_camera_io_ext ioext;

@@ -150,7 +150,7 @@ static int msm_gemini_init(struct platform_device *pdev)
 		GMN_PR_ERR("%s: initialization failed\n", __func__);
 		goto fail;
 	}
-
+#if 0//keonwoo 2012.03.13 gemini compile error (merged LS696)
 	v4l2_subdev_init(&msm_gemini_device_p->subdev, &msm_gemini_subdev_ops);
 	v4l2_set_subdev_hostdata(&msm_gemini_device_p->subdev,
 		msm_gemini_device_p);
@@ -158,7 +158,7 @@ static int msm_gemini_init(struct platform_device *pdev)
 			(uint32_t)msm_gemini_device_p);
 	GMN_DBG("%s:gemini: platform_set_drvdata\n", __func__);
 	platform_set_drvdata(pdev, &msm_gemini_device_p->subdev);
-
+#endif
 	rc = alloc_chrdev_region(&msm_gemini_devno, 0, 1, MSM_GEMINI_NAME);
 	if (rc < 0) {
 		GMN_PR_ERR("%s: failed to allocate chrdev\n", __func__);

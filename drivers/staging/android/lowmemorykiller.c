@@ -123,6 +123,13 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
 	struct zone *zone;
+#ifdef CONFIG_LGE_ANDROID_LOW_MEMORY_KILLER_PATCH
+	/*
+	 * to avoid too many oom-killer, check reclaimable page condition
+	 * Although lowmemorykiller got killed apks or selected adj well under the given condition, oom-killer is followed by sometime.
+	 */
+	int reclaimable_pages = global_reclaimable_pages();
+#endif
 
 	if (offlining) {
 		/* Discount all free space in the section being offlined */
@@ -152,11 +159,19 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
 	for (i = 0; i < array_size; i++) {
+#ifdef CONFIG_LGE_ANDROID_LOW_MEMORY_KILLER_PATCH
+		if (((other_free < lowmem_minfree[i]) && (other_file < lowmem_minfree[i])) 
+			||((other_free < lowmem_minfree[i]) && (reclaimable_pages < lowmem_minfree[i]))){
+			min_adj = lowmem_adj[i];
+			break;
+		}
+#else
 		if (other_free < lowmem_minfree[i] &&
 		    other_file < lowmem_minfree[i]) {
 			min_adj = lowmem_adj[i];
 			break;
 		}
+#endif	
 	}
 	if (sc->nr_to_scan > 0)
 		lowmem_print(3, "lowmem_shrink %lu, %x, ofree %d %d, ma %d\n",

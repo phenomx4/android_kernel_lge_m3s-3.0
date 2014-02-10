@@ -79,6 +79,12 @@
 #define MSM_TCSR_PHYS	      0xAB600000
 #define MSM_TCSR_SIZE	      SZ_4K
 
+/* LGE_S, Add Peripheral web */
+#define MSM_WEB_BASE         IOMEM(0xFA00B000)
+#define MSM_WEB_PHYS         0xACE00000
+#define MSM_WEB_SIZE          SZ_4K
+/* LGE_E, Add Peripheral web */
+
 #define MSM_SHARED_RAM_BASE   IOMEM(0xFA100000)
 #define MSM_SHARED_RAM_SIZE   SZ_1M
 

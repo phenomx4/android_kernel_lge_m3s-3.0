@@ -47,6 +47,10 @@ LIST_HEAD(dpm_prepared_list);
 LIST_HEAD(dpm_suspended_list);
 LIST_HEAD(dpm_noirq_list);
 
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+struct suspend_stats suspend_stats;
+#endif
+
 static DEFINE_MUTEX(dpm_list_mtx);
 static pm_message_t pm_transition;
 
@@ -471,9 +475,13 @@ void dpm_resume_noirq(pm_message_t state)
 		mutex_unlock(&dpm_list_mtx);
 
 		error = device_resume_noirq(dev, state);
-		if (error)
+		if (error) {
 			pm_dev_err(dev, state, " early", error);
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
 
+			suspend_stats.failed_resume_noirq++;
+#endif
+		}
 		mutex_lock(&dpm_list_mtx);
 		put_device(dev);
 	}
@@ -649,9 +657,12 @@ void dpm_resume(pm_message_t state)
 			mutex_unlock(&dpm_list_mtx);
 
 			error = device_resume(dev, state, false);
-			if (error)
+			if (error) {
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+				suspend_stats.failed_resume++;
+#endif
 				pm_dev_err(dev, state, "", error);
-
+			}
 			mutex_lock(&dpm_list_mtx);
 		}
 		if (!list_empty(&dev->power.entry))
@@ -825,6 +836,9 @@ int dpm_suspend_noirq(pm_message_t state)
 		mutex_lock(&dpm_list_mtx);
 		if (error) {
 			pm_dev_err(dev, state, " late", error);
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+			suspend_stats.failed_suspend_noirq++;
+#endif
 			put_device(dev);
 			break;
 		}
@@ -1011,6 +1025,11 @@ int dpm_suspend(pm_message_t state)
 		error = async_error;
 	if (!error)
 		dpm_show_time(starttime, state, NULL);
+	else{
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+		suspend_stats.failed_suspend++;
+#endif
+	}
 	return error;
 }
 
@@ -1125,6 +1144,11 @@ int dpm_suspend_start(pm_message_t state)
 	error = dpm_prepare(state);
 	if (!error)
 		error = dpm_suspend(state);
+	else{
+#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+		suspend_stats.failed_prepare++;
+#endif
+	}
 	return error;
 }
 EXPORT_SYMBOL_GPL(dpm_suspend_start);

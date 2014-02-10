@@ -176,6 +176,9 @@ struct sysfs_dirent *sysfs_get_dirent(struct sysfs_dirent *parent_sd,
 				      const unsigned char *name);
 struct sysfs_dirent *sysfs_get(struct sysfs_dirent *sd);
 void sysfs_put(struct sysfs_dirent *sd);
+#ifdef CONFIG_LGE_VERBOSE_LAST_SYSFS_FILE
+void sysfs_printk_last_file(void);
+#endif
 
 int __must_check sysfs_init(void);
 
@@ -339,6 +342,12 @@ static inline int __must_check sysfs_init(void)
 {
 	return 0;
 }
+
+#ifdef CONFIG_LGE_VERBOSE_LAST_SYSFS_FILE
+static inline void sysfs_printk_last_file(void)
+{
+}
+#endif
 
 #endif /* CONFIG_SYSFS */
 

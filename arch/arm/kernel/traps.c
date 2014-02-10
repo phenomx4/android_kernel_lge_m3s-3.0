@@ -37,6 +37,10 @@
 
 #include "signal.h"
 
+#ifdef CONFIG_LGE_ERS
+#include "../mach-msm/proc_comm.h"
+#endif
+
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
 void *vectors_page;
@@ -234,8 +238,15 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 	static int die_counter;
 	int ret;
 
+#ifdef CONFIG_LGE_ERS
+	printk(KERN_EMERG">>>>>\n");
+#endif
+
 	printk(KERN_EMERG "Internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
 	       str, err, ++die_counter);
+#ifdef CONFIG_LGE_VERBOSE_LAST_SYSFS_FILE
+	sysfs_printk_last_file();
+#endif
 
 	/* trap and error numbers are mostly meaningless on ARM */
 	ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
@@ -250,9 +261,23 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 	if (!user_mode(regs) || in_interrupt()) {
 		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
 			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+
+#ifdef CONFIG_LGE_ERS
+		printk(KERN_EMERG"vvvvv\n");
+#endif
+
 		dump_backtrace(regs, tsk);
 		dump_instr(KERN_EMERG, regs);
+
+#ifdef CONFIG_LGE_ERS
+		printk(KERN_EMERG"^^^^^\n");
+#endif
 	}
+
+// notify kernel panic to CP
+#ifdef CONFIG_LGE_ERS
+	msm_proc_comm(PCOM_OEM_AP_PANIC_CMD, 0, 0);
+#endif
 
 	return ret;
 }

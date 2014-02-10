@@ -63,6 +63,15 @@
 #include "sirc.h"
 #include "pm-boot.h"
 
+#ifdef CONFIG_LGE_ERS
+#include <linux/console.h>
+extern int smsm_change_state_nonotify(uint32_t smsm_entry,
+		      uint32_t clear_mask, uint32_t set_mask);
+#endif
+#ifdef CONFIG_LGE_AUDIO
+#include <mach/qdsp5v2/lge_tpa2055-amp.h>   
+#endif
+
 /******************************************************************************
  * Debug Definitions
  *****************************************************************************/
@@ -1720,8 +1729,74 @@ static struct platform_suspend_ops msm_pm_ops = {
 
 static uint32_t restart_reason = 0x776655AA;
 
+#ifdef CONFIG_LGE_ERS
+/* 
+ * flush console before reboot
+ * from google's mahimahi kernel
+ */
+
+static bool console_flushed;
+
+void msm_pm_flush_console(void)
+{
+	if (console_flushed)
+		return;
+	console_flushed = true;
+
+	printk("\n");
+	printk(KERN_EMERG "Restarting %s\n", linux_banner);
+	/*
+	if (!try_acquire_console_sem()) {
+		release_console_sem();
+		return;
+	}
+	*/
+	if (!console_trylock()) {
+		console_unlock();
+		return;
+	}
+
+	mdelay(50);
+
+	local_irq_disable();
+
+	/*
+	if (try_acquire_console_sem())
+		printk(KERN_EMERG "msm_restart: Console was locked! Busting\n");
+	else
+		printk(KERN_EMERG "msm_restart: Console was locked!\n");
+	release_console_sem();
+	*/
+	if (console_trylock())
+		printk(KERN_EMERG "msm_restart: Console was locked! Busting\n");
+	else
+		printk(KERN_EMERG "msm_restart: Console was locked!\n");
+	console_unlock();
+}
+#endif
+
+// clean the ram console when normal shutdown
+#if defined(CONFIG_LGE_RAM_CONSOLE_CLEAN)
+extern void ram_console_clean_buffer(void);
+#endif
+
+
 static void msm_pm_power_off(void)
 {
+#ifdef CONFIG_LGE_AUDIO
+//minyoung1.kim@lge.com - Desc: U0 Power Off sequence sometime not speaker path close issue. This issue come from China
+	set_amp_PowerDown(); 
+#endif
+#if defined(CONFIG_LGE_RAM_CONSOLE_CLEAN)
+	ram_console_clean_buffer();
+#endif
+
+#ifdef CONFIG_LGE_ERS
+	/* To prevent Phone freezing during power off */
+	smsm_change_state_nonotify(SMSM_APPS_STATE,
+							  0, SMSM_SYSTEM_POWER_DOWN);
+#endif
+
 	msm_rpcrouter_close();
 	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
 	for (;;)
@@ -1730,6 +1805,18 @@ static void msm_pm_power_off(void)
 
 static void msm_pm_restart(char str, const char *cmd)
 {
+#ifdef CONFIG_LGE_AUDIO 
+	//minyoung1.kim@lge.com - earjack noise issue
+		set_amp_PowerDown(); 
+#endif
+#ifdef CONFIG_LGE_ERS
+	/* 
+	 * flush console before reboot
+	 * from google's mahimahi kernel
+	 */
+	msm_pm_flush_console();
+#endif
+
 	msm_rpcrouter_close();
 	msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
 
@@ -1762,6 +1849,15 @@ static struct notifier_block msm_reboot_notifier = {
 	.notifier_call = msm_reboot_call,
 };
 
+#ifdef CONFIG_LGE_ERS
+// set restart_reason to detect in LK
+void lge_set_reboot_reason(unsigned int reason)
+{
+	restart_reason = reason;
+
+	return;
+}
+#endif
 
 /******************************************************************************
  *

@@ -151,6 +151,10 @@ static void
 __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		  struct pt_regs *regs)
 {
+#ifdef CONFIG_LGE_ERS
+	char panic_msg[100];
+#endif
+
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
@@ -161,13 +165,26 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 	bust_spinlocks(1);
+
+#ifdef CONFIG_LGE_ERS
+	memset(panic_msg, 0, 80);
+	sprintf(panic_msg, 
+		"Unable to handle kernel %s at virtual address %08lx\n",
+		(addr < PAGE_SIZE) ? "NULL dereference" :
+		"paging request", addr);
+#else
 	printk(KERN_ALERT
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
 		"paging request", addr);
+#endif
 
 	show_pte(mm, addr);
+#ifdef CONFIG_LGE_ERS
+	die(panic_msg, regs, fsr);
+#else
 	die("Oops", regs, fsr);
+#endif
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
 }

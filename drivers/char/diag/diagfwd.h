@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,9 @@
 #ifndef DIAGFWD_H
 #define DIAGFWD_H
 
+// LGE_CHANGE - 404030I PATCH BUILD ERROR
+#include <mach/msm_smd.h>
+
 #define NO_PROCESS	0
 #define NON_APPS_PROC	-1
 
@@ -23,7 +26,6 @@ void __diag_smd_send_req(void);
 void __diag_smd_qdsp_send_req(void);
 void __diag_smd_wcnss_send_req(void);
 void diag_usb_legacy_notifier(void *, unsigned, struct diag_request *);
-long diagchar_ioctl(struct file *, unsigned int, unsigned long);
 int diag_device_write(void *, int, struct diag_request *);
 int mask_request_validate(unsigned char mask_buf[]);
 void diag_clear_reg(int);

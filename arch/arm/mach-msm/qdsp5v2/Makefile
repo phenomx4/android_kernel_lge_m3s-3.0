@@ -6,8 +6,13 @@ else ifeq ($(CONFIG_MARIMBA_CODEC), y)
 obj-y += snddev_icodec.o
 endif
 
+ifeq ($(CONFIG_LGE_AUDIO), y)
+obj-$(CONFIG_MARIMBA_CODEC) += lge_snddev_data_marimba.o
+obj-$(CONFIG_TIMPANI_CODEC) += lge_snddev_data_timpani.o
+else
 obj-$(CONFIG_MARIMBA_CODEC) += snddev_data_marimba.o
 obj-$(CONFIG_TIMPANI_CODEC) += snddev_data_timpani.o
+endif
 
 obj-y += audio_pcm.o audpp.o audio_mp3.o audio_wma.o audio_aac.o audio_amrnb.o
 obj-y += audio_amrwb.o audio_wmapro.o audio_adpcm.o audio_evrc.o audio_qcelp.o

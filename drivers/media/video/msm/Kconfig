@@ -138,9 +138,9 @@ config QS_S5K4E1
 	  Samsung 5M with Autofocus
 
 config S5K4E1
-	bool "Sensor Sensor s5k4e1 (Samsung 5M)"
+	bool "Sensor s5k4e1 (Samsung 5M)"
 	depends on MSM_CAMERA
-	default n
+	default y
 	---help---
 	  Support for S5k4E1 samsung sensor driver.
 	  It is a Bayer 5MP sensor with auto focus and it supports
@@ -200,8 +200,8 @@ config MSM_ACTUATOR
 
 config MSM_GEMINI
 	tristate "Qualcomm MSM Gemini Jpeg Engine support"
-	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60 || ARCH_MSM8960)
-	default n
+	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60)    
+	default M                                                  
 	---help---
 	  Enable support for Gemini Jpeg Engine
 

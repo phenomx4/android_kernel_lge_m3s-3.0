@@ -2795,6 +2795,35 @@ int smsm_state_cb_deregister(uint32_t smsm_entry, uint32_t mask,
 }
 EXPORT_SYMBOL(smsm_state_cb_deregister);
 
+#ifdef CONFIG_LGE_ERS
+int smsm_change_state_nonotify(uint32_t smsm_entry,
+		      uint32_t clear_mask, uint32_t set_mask)
+{
+	unsigned long flags;
+	uint32_t  old_state, new_state;
+
+	if (smsm_entry >= SMSM_NUM_ENTRIES) {
+		pr_err("smsm_change_state: Invalid entry %d",
+		       smsm_entry);
+		return -EINVAL;
+	}
+
+	if (!smsm_info.state) {
+		pr_err("smsm_change_state <SM NO STATE>\n");
+		return -EIO;
+	}
+	spin_lock_irqsave(&smem_lock, flags);
+
+	old_state = readl(SMSM_STATE_ADDR(smsm_entry));
+	new_state = (old_state & ~clear_mask) | set_mask;
+	writel(new_state, SMSM_STATE_ADDR(smsm_entry));
+	SMSM_DBG("smsm_change_state %x\n", new_state);
+	
+	spin_unlock_irqrestore(&smem_lock, flags);
+
+	return 0;
+}
+#endif
 
 int smd_core_init(void)
 {

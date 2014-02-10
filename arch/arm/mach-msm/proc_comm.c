@@ -156,3 +156,31 @@ end:
 	return ret;
 }
 EXPORT_SYMBOL(msm_proc_comm);
+#ifdef CONFIG_LGE_CHARGING
+/* return value:
+ *         PM_PWR_ON_EVENT_KEYPAD     0x1
+ *         PM_PWR_ON_EVENT_RTC        0x2
+ *         PM_PWR_ON_EVENT_CABLE      0x4
+ *         PM_PWR_ON_EVENT_SMPL       0x8
+ *         PM_PWR_ON_EVENT_WDOG       0x10
+ *         PM_PWR_ON_EVENT_USB_CHG    0x20
+ *         PM_PWR_ON_EVENT_WALL_CHG   0x40
+ */
+unsigned lge_get_power_on_status(void)
+{
+	int err;
+	unsigned status;
+	unsigned ftm;
+
+	err = msm_proc_comm(PCOM_GET_POWER_ON_STATUS, &status, &ftm);
+	if (err < 0) {
+		pr_err("%s: msm_proc_comm(PCOM_GET_POWER_ON_STATUS) failed\n",
+		       __func__);
+		return err;
+	}
+
+	return status;
+}
+EXPORT_SYMBOL(lge_get_power_on_status);
+#endif
+

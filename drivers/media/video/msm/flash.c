@@ -21,6 +21,9 @@
 #include <mach/pmic.h>
 #include <mach/camera.h>
 #include <mach/gpio.h>
+#ifdef CONFIG_MSM_CAMERA_FLASH_LM3559
+#include <mach/board_lge.h>
+#endif
 
 struct i2c_client *sx150x_client;
 struct timer_list timer_flash;
@@ -29,6 +32,10 @@ enum msm_cam_flash_stat{
 	MSM_CAM_FLASH_OFF,
 	MSM_CAM_FLASH_ON,
 };
+
+#ifdef CONFIG_MSM_CAMERA_FLASH_LM3559
+extern int lm3559_flash_set_led_state(int state);
+#endif
 
 #if defined CONFIG_MSM_CAMERA_FLASH_SC628A
 static struct i2c_client *sc628a_client;
@@ -606,8 +613,14 @@ int msm_flash_ctrl(struct msm_camera_sensor_info *sdata,
 	sensor_data = sdata;
 	switch (flash_info->flashtype) {
 	case LED_FLASH:
+#ifdef CONFIG_MSM_CAMERA_FLASH_LM3559
+		rc = lm3559_flash_set_led_state(flash_info->ctrl_data.led_state);
+		pr_err("%s: lm3559_flash_set_led_state rc = %d\n", __func__, rc);
+#else
+		pr_err("LED_FLASH MODE\n");
 		rc = msm_camera_flash_set_led_state(sdata->flash_data,
 			flash_info->ctrl_data.led_state);
+#endif
 			break;
 	case STROBE_FLASH:
 		rc = msm_strobe_flash_ctrl(sdata->strobe_flash_data,

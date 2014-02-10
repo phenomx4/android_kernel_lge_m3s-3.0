@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include "diagchar.h"
 #include "diagfwd.h"
 #include "diagfwd_cntl.h"
+#include "lge_diag_kernel_service.h"
 
 #define HDR_SIZ 8
 
@@ -175,8 +176,10 @@ static void diag_smd_cntl_send_req(int proc_num)
 				temp -= pkt_params->count;
 				pkt_params->params = temp;
 				flag = 1;
-				diagchar_ioctl(NULL, DIAG_IOCTL_COMMAND_REG,
-						 (unsigned long)pkt_params);
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
+				diagchar_ioctl(DIAG_IOCTL_COMMAND_REG, (unsigned long)pkt_params);
+				//diagchar_ioctl(NULL, DIAG_IOCTL_COMMAND_REG,(unsigned long)pkt_params);
+//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Test mode porting from LS696 diag source
 				kfree(temp);
 			}
 			buf = buf + HDR_SIZ + data_len;

@@ -67,7 +67,15 @@ int xdr_send_bytes(struct msm_rpc_xdr *xdr, const void **data,
 	void *buf = xdr->out_buf + xdr->out_index;
 	uint32_t temp;
 
+#ifdef CONFIG_LGE_DIAG
+	/* No match oem rapi rpc interface arm9 and arm11 when input(*data) arg is null only
+	 * This code is work around code
+	 * 2010-05-17, taehung.kim@lge.com
+	 */
+	if (!size || !data)
+#else
 	if (!size || !data || !*data)
+#endif
 		return -1;
 
 	temp = *size;

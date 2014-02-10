@@ -1456,6 +1456,20 @@ msmsdcc_pio_irq(int irq, void *dev_id)
 
 		if (!msmsdcc_sg_next(host, &buffer, &remain))
 			break;
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [Start] 
+#ifdef CONFIG_MACH_LGE
+		/* LGE_CHANGE
+		* Exception handling : Kernel Panic issue by Null Pointer
+		* 2011-11-10, warkap.seo@lge.com
+		*/
+		if(!host->curr.data)
+		{
+			writel(0, base + MMCIMASK1);
+			spin_unlock(&host->lock);
+			return IRQ_HANDLED;
+		}
+#endif
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [End]
 
 		len = 0;
 		if (status & MCI_RXACTIVE)
@@ -3849,7 +3863,15 @@ msmsdcc_check_status(unsigned long data)
 			status = host->plat->status(mmc_dev(host->mmc));
 		else
 			status = msmsdcc_slot_status(host);
-
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [Start]
+#ifdef CONFIG_MACH_LGE
+		/* LGE_CHANGE
+		* Adding Print
+		* 2011-11-10, warkap.seo@lge.com
+		*/
+		printk(KERN_INFO "[LGE][MMC][%-18s( )] slot_status:%d, host->oldstat:%d, host->eject:%d\n", __func__, status, host->oldstat, host->eject);
+#endif 
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [End]		
 		host->eject = !status;
 
 		if (status ^ host->oldstat) {
@@ -3882,7 +3904,15 @@ static irqreturn_t
 msmsdcc_platform_status_irq(int irq, void *dev_id)
 {
 	struct msmsdcc_host *host = dev_id;
-
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [Start]
+#ifdef CONFIG_MACH_LGE
+	/* LGE_CHANGE
+	* Exception handling : Kernel Panic issue by Null Pointer
+	* 2011-11-10, warkap.seo@lge.com
+	*/
+	printk(KERN_INFO "[LGE][MMC][%-18s( )] irq:%d\n", __func__, irq);
+#endif
+//LGE_CHANGE_S [U0 CDMA] hongsic.kim Form G1TDR Porting by Null Pointer essue [End]
 	pr_debug("%s: %d\n", __func__, irq);
 	msmsdcc_check_status((unsigned long) host);
 	return IRQ_HANDLED;

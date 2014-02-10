@@ -2,7 +2,7 @@
  * Driver for HighSpeed USB Client Controller in MSM7K
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  * Author: Mike Lockwood <lockwood@android.com>
  *         Brian Swetland <swetland@google.com>
  *
@@ -74,6 +74,13 @@ static const char *const ep_name[] = {
 
 /*To release the wakelock from debugfs*/
 static int release_wlocks;
+//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
+static struct delayed_work usb_wake_unlock_wq;
+// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
+#endif
 
 struct msm_request {
 	struct usb_request req;
@@ -121,7 +128,6 @@ struct msm_endpoint {
 	unsigned actual_prime_fail_count;
 
 	unsigned wedged:1;
-	unsigned ep_enabled:1;
 	/* pointers to DMA transfer list area */
 	/* these are allocated from the usb_info dma space */
 	struct ept_queue_head *head;
@@ -151,6 +157,12 @@ static void usb_do_remote_wakeup(struct work_struct *w);
 #define REMOTE_WAKEUP_DELAY	msecs_to_jiffies(1000)
 #define PHY_STATUS_CHECK_DELAY	(jiffies + msecs_to_jiffies(1000))
 #define EPT_PRIME_CHECK_DELAY	(jiffies + msecs_to_jiffies(1000))
+//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
+#define USB_WAKE_UNLOCK_DELAY	msecs_to_jiffies(3000)
+#endif
 
 struct usb_info {
 	/* lock for register/queue/device state changes */
@@ -329,6 +341,19 @@ static int usb_get_max_power(struct usb_info *ui)
 	return bmaxpow;
 }
 
+//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
+static void usb_wake_unlock(struct work_struct *w)
+{
+	struct usb_info *ui = the_usb_info;
+
+    wake_unlock(&ui->wlock);
+}
+// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
+#endif
+
 static int usb_phy_stuck_check(struct usb_info *ui)
 {
 	/*
@@ -431,7 +456,15 @@ static void usb_chg_detect(struct work_struct *w)
 
 	atomic_set(&otg->chg_type, temp);
 	maxpower = usb_get_max_power(ui);
+
+/* LGE_CHANGE_S [START] 2012.6.5 jaeho.cho@lge.com to charge when VBUS line is connected but, dp/dm is disconnected*/
+#ifdef CONFIG_MACH_LGE_CHARGING
+	if (maxpower >= 0)
+#else
 	if (maxpower > 0)
+#endif
+/* LGE_CHANGE_S [END] 2012.6.5 jaeho.cho@lge.com to charge when VBUS line is connected but, dp/dm is disconnected */
+
 		otg_set_power(ui->xceiv, maxpower);
 
 	/* USB driver prevents idle and suspend power collapse(pc)
@@ -443,7 +476,13 @@ static void usb_chg_detect(struct work_struct *w)
 	 * */
 	if (temp == USB_CHG_TYPE__WALLCHARGER) {
 		pm_runtime_put_sync(&ui->pdev->dev);
+//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+		//prevent wake_unlock during connecting TA.
+#else		
 		wake_unlock(&ui->wlock);
+#endif
 	}
 }
 
@@ -678,14 +717,6 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 		return -EMSGSIZE;
 
 	spin_lock_irqsave(&ui->lock, flags);
-
-	if (ept->num != 0 && !ept->ep_enabled) {
-		req->req.status = -EINVAL;
-		spin_unlock_irqrestore(&ui->lock, flags);
-		dev_err(&ui->pdev->dev,
-			"%s: called for disabled endpoint\n", __func__);
-		return -EINVAL;
-	}
 
 	if (req->busy) {
 		req->req.status = -EBUSY;
@@ -1390,6 +1421,13 @@ static void usb_prepare(struct usb_info *ui)
 	INIT_DELAYED_WORK(&ui->rw_work, usb_do_remote_wakeup);
 	if (ui->pdata && ui->pdata->is_phy_status_timer_on)
 		INIT_WORK(&ui->phy_status_check, usb_phy_stuck_recover);
+	//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
+	INIT_DELAYED_WORK(&usb_wake_unlock_wq, usb_wake_unlock);
+// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }	
+#endif
 }
 
 static void usb_reset(struct usb_info *ui)
@@ -1599,7 +1637,17 @@ static void usb_do_work(struct work_struct *w)
 				usb_do_work_check_vbus(ui);
 				pm_runtime_put_noidle(&ui->pdev->dev);
 				pm_runtime_suspend(&ui->pdev->dev);
+
+//wantaek.lim@lge.com 2012.06.27 If USB/TA connect, Device wake up.
+// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
+//wantaek.lim 2012.08.27 CEC Requirment spec
+#ifndef CONFIG_MACH_LGE_CHARGING
+                cancel_delayed_work(&usb_wake_unlock_wq);    
+                schedule_delayed_work(&usb_wake_unlock_wq, USB_WAKE_UNLOCK_DELAY);
+                printk(KERN_DEBUG "%s: schedule_delayed_work(), 3sec\n",__func__);
+#else				
 				wake_unlock(&ui->wlock);
+#endif
 				break;
 			}
 			if (flags & USB_FLAG_SUSPEND) {
@@ -2020,7 +2068,6 @@ msm72k_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 	config_ept(ept);
 	ept->wedged = 0;
 	usb_ept_enable(ept, 1, ep_type);
-	ept->ep_enabled = 1;
 	return 0;
 }
 
@@ -2029,7 +2076,6 @@ static int msm72k_disable(struct usb_ep *_ep)
 	struct msm_endpoint *ept = to_msm_endpoint(_ep);
 
 	usb_ept_enable(ept, 0, 0);
-	ept->ep_enabled = 0;
 	flush_endpoint(ept);
 	return 0;
 }

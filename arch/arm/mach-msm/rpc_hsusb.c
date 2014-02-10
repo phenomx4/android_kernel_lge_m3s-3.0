@@ -604,6 +604,17 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 	if (ret)
 		return ret;
 
+/* LGE_CHANGE_S [START] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
+#ifdef CONFIG_LGE_USB_FACTORY_BELOW_MSM8X60
+	if (!snum) {
+		(void)msm_hsusb_is_serial_num_null(1);
+	}
+	else
+	{
+		(void)msm_hsusb_is_serial_num_null(0);
+		(void)msm_hsusb_send_serial_number(snum);
+	}
+#else
 	if (!snum) {
 		ret = msm_hsusb_is_serial_num_null(1);
 		if (ret)
@@ -616,6 +627,8 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 	ret = msm_hsusb_send_serial_number(snum);
 	if (ret)
 		return ret;
+#endif
+/* LGE_CHANGE_S [END] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
 
 	return 0;
 }

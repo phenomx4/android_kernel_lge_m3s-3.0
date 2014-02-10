@@ -52,8 +52,13 @@ static inline void mmc_delay(unsigned int ms)
 	if (ms < 1000 / HZ) {
 		cond_resched();
 		mdelay(ms);
+/*LGE_S,for SD card suspend/resume issue,SR:00774382*/
+#if defined(CONFIG_MMC) //1
+#else
 	} else if (ms < jiffies_to_msecs(2)) {
 		usleep_range(ms * 1000, (ms + 1) * 1000);
+#endif
+/*LGE_E,for SD card suspend/resume issue,SR:00774382*/
 	} else {
 		msleep(ms);
 	}

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -151,12 +151,29 @@ int chk_apps_master(void)
 		return 0;
 }
 
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+int user_diag_enable= 1;
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
+/* LGE_CHANGE_S [START] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */ 
+#ifdef CONFIG_LGE_DIAG_USB_PERMANENT_LOCK
+int user_diag_unlock_fail_cnt = 0;
+#endif
+/* LGE_CHANGE_S [END] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */
+
 void __diag_smd_send_req(void)
 {
 	void *buf = NULL;
 	int *in_busy_ptr = NULL;
 	struct diag_request *write_ptr_modem = NULL;
-
+	
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+	if (user_diag_enable == 1)
+	{
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
 	if (!driver->in_busy_1) {
 		buf = driver->buf_in_1;
 		write_ptr_modem = driver->write_ptr_1;
@@ -195,6 +212,15 @@ void __diag_smd_send_req(void)
 			}
 		}
 	}
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+	}
+else
+	{
+	printk("DIAG disabled now\n");
+	}
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
 }
 
 int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
@@ -346,7 +372,13 @@ void __diag_smd_qdsp_send_req(void)
 	void *buf = NULL;
 	int *in_busy_qdsp_ptr = NULL;
 	struct diag_request *write_ptr_qdsp = NULL;
-
+	
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+	if (user_diag_enable == 1)
+	{
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
 	if (!driver->in_busy_qdsp_1) {
 		buf = driver->buf_in_qdsp_1;
 		write_ptr_qdsp = driver->write_ptr_qdsp_1;
@@ -385,6 +417,15 @@ void __diag_smd_qdsp_send_req(void)
 			}
 		}
 	}
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+}
+else
+{
+printk("Diag disabled now\n");
+}
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
 }
 
 static void diag_print_mask_table(void)
@@ -437,7 +478,6 @@ void diag_create_msg_mask_table(void)
 	CREATE_MSG_MASK_TBL_ROW(20);
 	CREATE_MSG_MASK_TBL_ROW(21);
 	CREATE_MSG_MASK_TBL_ROW(22);
-	CREATE_MSG_MASK_TBL_ROW(23);
 }
 
 static void diag_set_msg_mask(int rt_mask)
@@ -860,6 +900,20 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 	int payload_length;
 	unsigned char *ptr;
 #endif
+	
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [Start]
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
+/* LGE_CHANGE_S [START] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */
+#ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION
+		if (buf[0]!=0xA1 && buf[0]!=0xA0 && (user_diag_enable == 0))
+			return 0;
+#else
+/* LGE_CHANGE_S [END] 2012.05.30 choongnam.kim@lge.com to enable ##USBLOCK# */
+	if (buf[0]!=0xA1 && user_diag_enable == 0)
+		return 0;
+#endif
+#endif
+//LGE_CHANGE_S [jinhwan.do][2012.03.09]USB Access Lock Porting [End]
 
 	/* Set log masks */
 	if (*buf == 0x73 && *(int *)(buf+4) == 3) {
@@ -940,7 +994,12 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 				diag_send_msg_mask_update(driver->ch_wcnss_cntl,
 					 ssid_first, ssid_last, WCNSS_PROC);
 			ENCODE_RSP_AND_SEND(8 + ssid_range - 1);
+#ifndef CONFIG_LGE_DIAG_ICD //LGE_CHANGE [jinhwan.do][2012.05.03] for blocking Slate Test Command of Key_Toucht event
+      			printk(KERN_INFO "[SLATE] Key Logging mask received. NOT U0_CDMA, returning..");
 			return 0;
+#else
+      			printk(KERN_INFO "[SLATE] Key Logging mask received. Propagate this msg to APPS..");
+#endif
 		} else
 			buf = temp;
 #endif
@@ -1115,8 +1174,7 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 		driver->apps_rsp_buf[1] = 0x1;
 		driver->apps_rsp_buf[2] = 0x1;
 		driver->apps_rsp_buf[3] = 0x0;
-		/* -1 to un-account for OEM SSID range */
-		*(int *)(driver->apps_rsp_buf + 4) = MSG_MASK_TBL_CNT - 1;
+		*(int *)(driver->apps_rsp_buf + 4) = MSG_MASK_TBL_CNT;
 		*(uint16_t *)(driver->apps_rsp_buf + 8) = MSG_SSID_0;
 		*(uint16_t *)(driver->apps_rsp_buf + 10) = MSG_SSID_0_LAST;
 		*(uint16_t *)(driver->apps_rsp_buf + 12) = MSG_SSID_1;
@@ -1352,6 +1410,9 @@ void diag_process_hdlc(void *data, unsigned len)
 {
 	struct diag_hdlc_decode_type hdlc;
 	int ret, type = 0;
+#ifdef CONFIG_LGE_DIAG
+	unsigned int nTempLen = 0;
+#endif
 	pr_debug("diag: HDLC decode fn, len of data  %d\n", len);
 	hdlc.dest_ptr = driver->hdlc_buf;
 	hdlc.dest_size = USB_MAX_OUT_BUF;
@@ -1360,6 +1421,85 @@ void diag_process_hdlc(void *data, unsigned len)
 	hdlc.src_idx = 0;
 	hdlc.dest_idx = 0;
 	hdlc.escaping = 0;
+/* - In the Radio test process, APP will send packet with double 0x7E tail.  */
+#ifdef CONFIG_LGE_DIAG
+
+	if( len > 2 )
+	{
+		if( hdlc.src_ptr[len -1] == 0x7E && hdlc.src_ptr[len -2] == 0x7E){
+			len--;
+			hdlc.src_size--;
+		}
+	}
+
+/* - If packet is started with 0x7E( LG Factory packet), we can not received all of thing.  */
+	do
+	{
+		ret = diag_hdlc_decode(&hdlc);
+
+		nTempLen = hdlc.dest_idx;
+
+		if(ret)
+		{
+			hdlc.dest_idx = 0;	  /* Initialize for the next packet */
+		}
+
+		if( hdlc.src_idx >=  hdlc.src_size){
+			//ret = 1;
+			break;
+		}
+		else{
+			ret = 0;
+		}
+	}while ( ret == 0 );
+
+	if (ret)
+		type = diag_process_apps_pkt(driver->hdlc_buf,
+							  nTempLen - 3);
+	else if (driver->debug_flag) {
+		printk(KERN_ERR "Packet dropped due to bad HDLC coding/CRC"
+				" errors or partial packet received, packet"
+				" length = %d\n", len);
+		print_hex_dump(KERN_DEBUG, "Dropped Packet Data: ", 16, 1,
+					   DUMP_PREFIX_ADDRESS, data, len, 1);
+		driver->debug_flag = 0;
+	}
+	/* send error responses from APPS for Central Routing */
+	if (type == 1 && chk_apps_only()) {
+		diag_send_error_rsp(nTempLen);
+		type = 0;
+	}
+	/* implies this packet is NOT meant for apps */
+	if (!(driver->ch) && type == 1) {
+		if (chk_apps_only()) {
+			diag_send_error_rsp(nTempLen);
+		} else { /* APQ 8060, Let Q6 respond */
+			if (driver->chqdsp)
+				smd_write(driver->chqdsp, driver->hdlc_buf,
+						  nTempLen - 3);
+		}
+		type = 0;
+	}
+
+#ifdef DIAG_DEBUG
+	pr_debug("diag: hdlc.dest_idx = %d", nTempLen);
+	for (i = 0; i < nTempLen; i++)
+		printk(KERN_DEBUG "\t%x", *(((unsigned char *)
+							driver->hdlc_buf)+i));
+#endif /* DIAG DEBUG */
+	/* ignore 2 bytes for CRC, one for 7E and send */
+	if ((driver->ch) && (ret) && (type) && (nTempLen > 3)) {
+		APPEND_DEBUG('g');
+		smd_write(driver->ch, driver->hdlc_buf, nTempLen - 3);
+		APPEND_DEBUG('h');
+#ifdef DIAG_DEBUG
+		printk(KERN_INFO "writing data to SMD, pkt length %d\n", len);
+		print_hex_dump(KERN_DEBUG, "Written Packet Data to SMD: ", 16,
+			       1, DUMP_PREFIX_ADDRESS, data, len, 1);
+#endif /* DIAG DEBUG */
+	}
+
+#else /*CONFIG_LGE_DIAG*/
 
 	ret = diag_hdlc_decode(&hdlc);
 
@@ -1408,6 +1548,7 @@ void diag_process_hdlc(void *data, unsigned len)
 			       1, DUMP_PREFIX_ADDRESS, data, len, 1);
 #endif /* DIAG DEBUG */
 	}
+#endif /*CONFIG_LGE_DIAG*/
 }
 
 #ifdef CONFIG_DIAG_OVER_USB

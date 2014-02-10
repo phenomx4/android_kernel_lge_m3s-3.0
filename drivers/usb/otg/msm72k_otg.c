@@ -31,6 +31,11 @@
 #include <linux/uaccess.h>
 #include <mach/clk.h>
 #include <mach/msm_xo.h>
+/* LGE_CHANGE_S [START] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
+#if defined (CONFIG_USB_G_LGE_ANDROID) && defined(CONFIG_LGE_USB_FACTORY_BELOW_MSM8X60)
+#include <linux/platform_data/lge_android_usb.h>
+#endif
+/* LGE_CHANGE_S [END] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
 
 #define MSM_USB_BASE	(dev->regs)
 #define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
@@ -1543,6 +1548,11 @@ static int msm_otg_phy_reset(struct msm_otg *dev)
 
 	return 0;
 }
+/* LGE_CHANGE_S [START] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
+#ifdef CONFIG_LGE_USB_FACTORY_BELOW_MSM8X60
+extern int android_boot_cable_type(void);
+#endif
+/* LGE_CHANGE_S [END] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
 
 static void otg_reset(struct otg_transceiver *xceiv, int phy_reset)
 {
@@ -1649,6 +1659,36 @@ reset_link:
 		wake_lock(&dev->wlock);
 		queue_work(dev->wq, &dev->sm_work);
 	}
+
+/* LGE_CHANGE_S [START] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
+#if defined (CONFIG_LGE_USB_FACTORY_BELOW_MSM8X60) && defined (CONFIG_LGE_PM)
+#ifdef xxxCONFIG_LGE_USB_GADGET_SUPPORT_FACTORY_USB   //yckim.kim@lge.com 120328 compile error : udc_cable not used
+		if(lg_manual_test_mode && udc_cable == 0)
+		{
+			USB_DBG("lg_manual_test_mode factory usb\n");
+			udc_cable=LG_FACTORY_CABLE_56K_TYPE;
+		}
+#endif
+		if(android_boot_cable_type() == LT_CABLE_56K)
+		{
+			unsigned tmp = 0; 
+			pr_debug( "factory cable 56kohm, usb full-speed\n");
+	
+			tmp = ulpi_read(dev, 0x04);
+			tmp |= 0x4;
+			ulpi_write(dev, tmp, 0x04);
+			writel(readl(USB_PORTSC) | (1<<24), USB_PORTSC);
+			
+			ulpi_write(dev, 0x0A, 0x0F);
+			ulpi_write(dev, 0x0A, 0x12);
+		}
+		else if(android_boot_cable_type() == LT_CABLE_130K || android_boot_cable_type() == LT_CABLE_910K)
+		{
+			ulpi_write(dev, 0x0A, 0x0F);
+			ulpi_write(dev, 0x0A, 0x12);
+		}
+#endif
+/* LGE_CHANGE_S [END] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
 }
 
 static void msm_otg_sm_work(struct work_struct *w)

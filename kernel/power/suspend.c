@@ -24,6 +24,9 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <trace/events/power.h>
+#ifdef CONFIG_LGE_LOG_SERVICE
+#include <linux/rtc.h>
+#endif
 
 #include "power.h"
 
@@ -35,6 +38,9 @@ const char *const pm_states[PM_SUSPEND_MAX] = {
 	[PM_SUSPEND_MEM]	= "mem",
 };
 
+#ifdef CONFIG_LGE_LOG_SERVICE
+static int sleep_enter = 0;
+#endif
 static const struct platform_suspend_ops *suspend_ops;
 
 /**
@@ -90,7 +96,8 @@ static int suspend_test(int level)
 static int suspend_prepare(void)
 {
 	int error;
-
+	
+//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
 	if (!suspend_ops || !suspend_ops->enter)
 		return -EPERM;
 
@@ -105,8 +112,18 @@ static int suspend_prepare(void)
 		goto Finish;
 
 	error = suspend_freeze_processes();
+	/*LGE_CHANGE_S : create sleep debugfs*/
+	#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+	if (error) {
+		suspend_stats.failed_freeze++;
+		dpm_save_failed_step(SUSPEND_FREEZE);
+	} else
+		return 0;
+	#else /*qct orginal*/
 	if (!error)
 		return 0;
+	#endif
+	/*LGE_CHANGE_E : create sleep debugfs*/
 
 	suspend_thaw_processes();
 	usermodehelper_enable();
@@ -138,6 +155,7 @@ static int suspend_enter(suspend_state_t state)
 {
 	int error;
 
+//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
 	if (suspend_ops->prepare) {
 		error = suspend_ops->prepare();
 		if (error)
@@ -203,6 +221,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 {
 	int error;
 
+//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
 	if (!suspend_ops)
 		return -ENOSYS;
 
@@ -228,6 +247,18 @@ int suspend_devices_and_enter(suspend_state_t state)
  Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
+#ifdef CONFIG_LGE_LOG_SERVICE
+	if(sleep_enter == 1){
+		struct timespec ts;
+		struct rtc_time tm;
+		getnstimeofday(&ts);
+		rtc_time_to_tm(ts.tv_sec, &tm);
+		printk(KERN_UTC_WAKEUP "%d-%02d-%02d %02d:%02d:%02d.%06lu\n",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000);
+		sleep_enter = 0;
+	}
+#endif
 	suspend_test_finish("resume devices");
 	resume_console();
  Close:
@@ -308,8 +339,27 @@ int enter_state(suspend_state_t state)
  */
 int pm_suspend(suspend_state_t state)
 {
+	/*LGE_CHANGE_S : create sleep debugfs*/
+	#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+	int ret;
+
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
+	if (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX) {
+		ret = enter_state(state);
+		if (ret) {
+			suspend_stats.fail++;
+			dpm_save_failed_errno(ret);
+		} else{
+			suspend_stats.success++;
+		}
+		
+		return ret;
+	}
+	#else /*qct original*/
 	if (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX)
 		return enter_state(state);
+	#endif
+	/*LGE_CHANGE_E : create sleep debugfs*/
 	return -EINVAL;
 }
 EXPORT_SYMBOL(pm_suspend);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +17,8 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
 
 /* Libra SDIO function device */
 static struct sdio_func *libra_sdio_func;
@@ -28,14 +30,91 @@ static unsigned short  libra_sdio_card_id;
 
 /* completion variables */
 struct completion gCard_rem_event_var;
-EXPORT_SYMBOL(gCard_rem_event_var);
 struct completion gShutdown_event_var;
-EXPORT_SYMBOL(gShutdown_event_var);
 
 static suspend_handler_t *libra_suspend_hldr;
 static resume_handler_t *libra_resume_hldr;
 static notify_card_removal_t *libra_notify_card_removal_hdlr;
 static shutdown_handler_t *libra_sdio_shutdown_hdlr;
+
+EXPORT_SYMBOL(gCard_rem_event_var);
+EXPORT_SYMBOL(gShutdown_event_var);
+
+static int libra_readwrite_file(const char *filename, char *rbuf,
+		const char *wbuf, size_t length)
+{
+	int ret = 0;
+	struct file *filp = (struct file *)-ENOENT;
+	mm_segment_t oldfs;
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	do {
+		int mode = (wbuf) ? O_RDWR : O_RDONLY;
+		filp = filp_open(filename, mode, S_IRUSR);
+		if (IS_ERR(filp) || !filp->f_op) {
+			printk(KERN_ERR "%s: file %s filp_open error\n",
+					__func__, filename);
+			ret = -ENOENT;
+			goto file_open_fail;
+		}
+
+		if (length == 0) {
+			/* Read the length of the file only */
+			struct inode    *inode;
+
+			inode = GET_INODE_FROM_FILEP(filp);
+			if (!inode) {
+				printk(KERN_ERR "%s: Get inode from %s failed\n",
+						__func__, filename);
+				ret = -ENOENT;
+				goto file_rw_fail;
+			}
+			ret = i_size_read(inode->i_mapping->host);
+			goto file_rw_comp;
+		}
+
+		if (wbuf) {
+			ret = filp->f_op->write(filp, wbuf, length,
+					&filp->f_pos);
+			if (ret  < 0) {
+				printk(KERN_ERR "%s: Write %u bytes to file %s"
+						" error %d\n", __func__, length,
+						filename, ret);
+				goto file_rw_fail;
+			}
+		} else {
+			ret = filp->f_op->read(filp, rbuf, length,
+					&filp->f_pos);
+			if (ret < 0) {
+				printk(KERN_ERR "%s: Read %u bytes from file %s"
+						" error %d\n", __func__,
+						length, filename, ret);
+				goto file_rw_fail;
+			}
+		}
+	} while (0);
+
+
+file_rw_comp:
+file_rw_fail:
+	filp_close(filp, NULL);
+file_open_fail:
+	set_fs(oldfs);
+
+	return ret;
+}
+
+void enable_mmchost_detect_change(const char *mmc_msm_dev, int enable)
+{
+	char buf[3];
+	char filename[100] = "/sys/devices/platform/";
+	int length;
+	strncat(filename, mmc_msm_dev, strnlen(mmc_msm_dev, 20));
+	strncat(filename, "/polling", 8);
+	length = snprintf(buf, sizeof(buf), "%d\n", enable ? 1 : 0);
+	libra_readwrite_file(filename, NULL, buf, length);
+}
+EXPORT_SYMBOL(enable_mmchost_detect_change);
 
 int libra_enable_sdio_irq_in_chip(struct sdio_func *func, u8 enable)
 {
@@ -459,6 +538,7 @@ static int libra_sdio_resume(struct device *dev)
 #define libra_sdio_resume 0
 #endif
 
+#ifdef LIBRA_SHUTDOWN_HANDLER
 static void libra_sdio_shutdown(struct device *dev)
 {
 	if (libra_sdio_shutdown_hdlr) {
@@ -467,6 +547,9 @@ static void libra_sdio_shutdown(struct device *dev)
 			 __func__);
 	}
 }
+#else
+#define libra_sdio_shutdown 0
+#endif 
 
 int libra_sdio_register_shutdown_hdlr(
 		shutdown_handler_t *libra_shutdown_hdlr)

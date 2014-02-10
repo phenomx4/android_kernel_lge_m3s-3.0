@@ -83,6 +83,12 @@ static void input_pass_event(struct input_dev *dev,
 	rcu_read_lock();
 
 	handle = rcu_dereference(dev->grab);
+
+	
+//wantaek.lim@lge.com 2012.04.18 Add key event log
+	if(type == 1)
+		printk(KERN_INFO " [SLEEP WAKE UP] %s type = %d  code = %d, value = %d \n", __func__,type , code, value); 
+	
 	if (handle)
 		handle->handler->event(handle, type, code, value);
 	else {
@@ -1574,9 +1580,19 @@ void input_reset_device(struct input_dev *dev)
 		 * Keys that have been pressed at suspend time are unlikely
 		 * to be still pressed when we resume.
 		 */
+
+/* LGE_CHANGE  //wantaek.lim@lge.com L0 
+* During Suspend & Resume Do not release keys for Power Long Key press.  
+* If some devices want to release pressed keys on Suspend,  
+* Add the routine on each devices.  
+* fred.cho@lge.com, 2012-03-19  
+*/  
+/*
 		spin_lock_irq(&dev->event_lock);
 		input_dev_release_keys(dev);
 		spin_unlock_irq(&dev->event_lock);
+*/
+
 	}
 
 	mutex_unlock(&dev->mutex);

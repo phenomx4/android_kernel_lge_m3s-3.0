@@ -172,6 +172,10 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(time_to_full_avg),
 	POWER_SUPPLY_ATTR(type),
 	POWER_SUPPLY_ATTR(scope),
+#ifdef CONFIG_MACH_LGE_CHARGING	
+//wantaek.lim@lge.com 2012.06.28	
+	POWER_SUPPLY_ATTR(xo_temp),
+#endif	
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),

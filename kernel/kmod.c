@@ -40,6 +40,11 @@
 
 #include <trace/events/module.h>
 
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+#include <linux/syscalls.h> // for getpid, kill
+#include <asm/signal.h> // for kill
+#endif
+
 extern int max_threads;
 
 static struct workqueue_struct *khelper_wq;
@@ -134,6 +139,23 @@ int __request_module(bool wait, const char *fmt, ...)
 EXPORT_SYMBOL(__request_module);
 #endif /* CONFIG_MODULES */
 
+
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+static bool call_usermodehelper_timeout_flag = 0;
+static int call_usermodehelper_timeout_pid = -1;
+
+static void get_call_usermodehelper_timeout(bool *flag, pid_t *pid)
+{
+	*flag = call_usermodehelper_timeout_flag;
+	*pid = call_usermodehelper_timeout_pid;
+}
+static void set_call_usermodehelper_timeout(bool flag, pid_t pid)
+{
+	call_usermodehelper_timeout_flag = flag;
+	call_usermodehelper_timeout_pid = pid;
+}
+#endif
+
 /*
  * This is the task which runs the usermode application
  */
@@ -142,6 +164,10 @@ static int ____call_usermodehelper(void *data)
 	struct subprocess_info *sub_info = data;
 	struct cred *new;
 	int retval;
+
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	sub_info->cpid = sys_getpid();
+#endif
 
 	spin_lock_irq(&current->sighand->siglock);
 	flush_signal_handlers(current, 1);
@@ -200,6 +226,10 @@ static int wait_for_helper(void *data)
 {
 	struct subprocess_info *sub_info = data;
 	pid_t pid;
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	bool timeout_flag = 0;
+	pid_t timeout_pid = -1;
+#endif
 
 	/* If SIGCLD is ignored sys_wait4 won't populate the status. */
 	spin_lock_irq(&current->sighand->siglock);
@@ -231,7 +261,21 @@ static int wait_for_helper(void *data)
 			sub_info->retval = ret;
 	}
 
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	get_call_usermodehelper_timeout(&timeout_flag, &timeout_pid);
+
+	if((timeout_flag == 1) && (timeout_pid == pid))
+	{
+		printk(KERN_ERR "%s pid : %d timeout and got killed! skip complete\n", __func__, (int)pid);
+	}
+	else
+	{
+		complete(sub_info->complete);
+	}
+#else
 	complete(sub_info->complete);
+#endif
+
 	return 0;
 }
 
@@ -252,6 +296,10 @@ static void __call_usermodehelper(struct work_struct *work)
 	else
 		pid = kernel_thread(____call_usermodehelper, sub_info,
 				    CLONE_VFORK | SIGCHLD);
+
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	sub_info->ppid= pid;
+#endif
 
 	switch (wait) {
 	case UMH_NO_WAIT:
@@ -400,6 +448,23 @@ void call_usermodehelper_setfns(struct subprocess_info *info,
 }
 EXPORT_SYMBOL(call_usermodehelper_setfns);
 
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+static int atoi(const char *name)
+{
+	int val = 0;
+
+	for (;; name++) {
+		switch (*name) {
+		case '0' ... '9':
+			val = 10*val+(*name-'0');
+			break;
+		default:
+			return val;
+		}
+	}
+}
+#endif
+
 /**
  * call_usermodehelper_exec - start a usermode application
  * @sub_info: information about the subprocessa
@@ -417,6 +482,11 @@ int call_usermodehelper_exec(struct subprocess_info *sub_info,
 {
 	DECLARE_COMPLETION_ONSTACK(done);
 	int retval = 0;
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	char * timeout_str = NULL;
+	int timeout_val = 0;
+	unsigned long timeleft;
+#endif
 
 	helper_lock();
 	if (sub_info->path[0] == '\0')
@@ -433,7 +503,45 @@ int call_usermodehelper_exec(struct subprocess_info *sub_info,
 	queue_work(khelper_wq, &sub_info->work);
 	if (wait == UMH_NO_WAIT)	/* task has freed sub_info */
 		goto unlock;
+#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
+	if((sub_info->envp)&&(sub_info->envp[0])&&(sub_info->envp[1])&&(sub_info->envp[2]))
+		timeout_str = strstr(sub_info->envp[2], "timeout");
+
+	if(timeout_str)
+	{
+		//printk(KERN_INFO "timeout_str : %s\n", timeout_str);
+		timeout_str += strlen("timeout=");
+		timeout_val = atoi(timeout_str);
+		//printk(KERN_INFO "timeout_val : %d msecs\n", timeout_val*1000);
+		timeleft = wait_for_completion_timeout(&done, msecs_to_jiffies(timeout_val*1000));
+		//printk(KERN_INFO "timeleft : %ld msecs\n", timeleft);
+
+		/*
+		 * if timeout is not handled, spinlock bad magic bug will be reported and it'll make watchdog reset
+		 * kernel_thread_exit() -> wait_for_helper() -> complete() -> _raw_spin_lock_irqsave() -> do_raw_spin_lock()
+		 */
+		if(timeleft == 0)
+		{
+			printk(KERN_ERR "%s timeout\n", __func__);
+
+			set_call_usermodehelper_timeout(1, sub_info->cpid);
+
+			complete(sub_info->complete);
+
+			printk(KERN_INFO "%s kill cpid : %d, ppid : %d\n", __func__, (int)sub_info->cpid, (int)sub_info->ppid);
+			sys_kill(sub_info->cpid, SIGKILL);
+			sys_kill(sub_info->ppid, SIGKILL);
+
+			retval = -EBUSY;
+			goto out;
+		}
+	}
+	else
+		wait_for_completion(&done);
+#else
 	wait_for_completion(&done);
+#endif
+
 	retval = sub_info->retval;
 
 out:

@@ -2262,6 +2262,9 @@ static struct rcg_clk lpa_codec_clk = {
 	},
 };
 
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+
+#else
 static struct clk_freq_tbl clk_tbl_mdc[] = {
 	F_RAW(1, NULL, 0, 0, 0, 0, NULL),
 	F_END
@@ -2287,6 +2290,7 @@ static struct rcg_clk mdc_clk = {
 		CLK_INIT(mdc_clk.c),
 	},
 };
+#endif
 
 static struct branch_clk lpa_core_clk = {
 	.b = {
@@ -2354,7 +2358,10 @@ static DEFINE_CLK_PCOM(p_emdh_clk, EMDH_CLK, CLKFLAG_MIN | CLKFLAG_MAX);
 static DEFINE_CLK_PCOM(p_emdh_p_clk, EMDH_P_CLK, 0);
 static DEFINE_CLK_PCOM(p_i2c_clk, I2C_CLK, CLKFLAG_SKIP_AUTO_OFF);
 static DEFINE_CLK_PCOM(p_i2c_2_clk, I2C_2_CLK, CLKFLAG_SKIP_AUTO_OFF);
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#else
 static DEFINE_CLK_PCOM(p_mdc_clk, MDC_CLK, CLKFLAG_SKIP_AUTO_OFF);
+#endif
 static DEFINE_CLK_PCOM(p_pmdh_clk, PMDH_CLK, CLKFLAG_MIN | CLKFLAG_MAX);
 static DEFINE_CLK_PCOM(p_pmdh_p_clk, PMDH_P_CLK, CLKFLAG_SKIP_AUTO_OFF);
 static DEFINE_CLK_PCOM(p_sdc1_clk, SDC1_CLK, 0);
@@ -2480,7 +2487,10 @@ static struct measure_sel measure_mux[] = {
 	{ CLK_TEST_LS(0x10), &mi2s_codec_tx_m_clk.c },
 	{ CLK_TEST_LS(0x13), &mdp_vsync_clk.c },
 	{ CLK_TEST_LS(0x15), &vfe_p_clk.c },
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#else
 	{ CLK_TEST_LS(0x16), &mdc_clk.c },
+#endif
 	{ CLK_TEST_LS(0x17), &vfe_mdc_clk.c },
 	{ CLK_TEST_LS(0x18), &usb_hs_p_clk.c },
 	{ CLK_TEST_LS(0x1C), &uart1dm_p_clk.c },
@@ -2824,7 +2834,10 @@ static struct clk_local_ownership {
 	OWN(ROW1,  7, "emdh_pclk",	emdh_p_clk,	"msm_mddi.1"),
 	OWN(ROW1, 11, "core_clk",	i2c_clk,	"msm_i2c.0"),
 	OWN(ROW1, 12, "core_clk",	i2c_2_clk,	"msm_i2c.2"),
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#else
 	OWN(ROW1, 17, "mdc_clk",	mdc_clk,	NULL),
+#endif
 	OWN(ROW1, 19, "mddi_clk",	pmdh_clk,	NULL),
 	OWN(ROW1, 19, "mddi_pclk",	pmdh_p_clk,	NULL),
 	OWN(ROW1, 23, "core_clk",	sdc1_clk,	"msm_sdcc.1"),
@@ -2979,7 +2992,10 @@ static void __init msm7x30_clock_init(void)
 	clk_set_rate(&mi2s_m_clk.c, 12288000);
 	clk_set_rate(&mdp_vsync_clk.c, 24576000);
 	clk_set_rate(&glbl_root_clk.c, 1);
+#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#else
 	clk_set_rate(&mdc_clk.c, 1);
+#endif
 	/* Sync the LPA_CODEC clock to MI2S_CODEC_RX */
 	clk_set_rate(&lpa_codec_clk.c, 1);
 	/* Sync the GRP2D clock to AXI */

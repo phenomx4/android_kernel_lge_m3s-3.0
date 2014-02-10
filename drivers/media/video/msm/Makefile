@@ -3,6 +3,7 @@ ifeq ($(GCC_VERSION),0404)
 CFLAGS_REMOVE_msm_vfe8x.o = -Wframe-larger-than=1024
 endif
 
+obj-$(CONFIG_MSM_CAMERA) += msm_camera.o
 ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
   EXTRA_CFLAGS += -Idrivers/media/video/msm/csi
   EXTRA_CFLAGS += -Idrivers/media/video/msm/io
@@ -12,8 +13,14 @@ ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
 else
   obj-$(CONFIG_MSM_CAMERA) += msm_camera.o
 endif
-obj-$(CONFIG_MSM_CAMERA) += msm_axi_qos.o gemini/
-obj-$(CONFIG_MSM_CAMERA_FLASH) += flash.o
+#Start LGE_BSP_CAMERA::keonwoo01.park@lge.com 2012-03-13 gemini update  
+#lavanya start 
+#added hardware jpeg encoder 
+obj-$(CONFIG_MSM_GEMINI) += gemini/ 
+#lavanya end 
+#End LGE_BSP_CAMERA::keonwoo01.park@lge.com 2012-03-13 gemini update 
+obj-$(CONFIG_MSM_CAMERA) += msm_axi_qos.o
+obj-$(CONFIG_MSM_CAMERA) += flash.o
 obj-$(CONFIG_ARCH_MSM_ARM11) += msm_vfe7x.o msm_io7x.o
 ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_ARCH_MSM7X27A) += msm_vfe7x27a_v4l2.o msm_io_7x27a_v4l2.o
@@ -36,6 +43,8 @@ obj-$(CONFIG_MSM_CAMERA_AF_FOXCONN) += mt9p012_fox.o
 obj-$(CONFIG_MSM_CAMERA_AF_BAM) += mt9p012_bam.o
 obj-$(CONFIG_MT9P012_KM) += mt9p012_km.o mt9p012_km_reg.o
 obj-$(CONFIG_S5K3E2FX) += s5k3e2fx.o
+obj-$(CONFIG_S5K4E1) += s5k4e1.o s5k4e1_reg.o
+obj-$(CONFIG_MSM_CAMERA_FLASH_LM3559) += lm3559_flash.o
 #FIXME: Merge the two ifeq causes VX6953 preview not coming up.
 ifneq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_VX6953) += vx6953.o vx6953_reg.o

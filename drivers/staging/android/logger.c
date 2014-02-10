@@ -432,8 +432,20 @@ static int logger_release(struct inode *ignored, struct file *file)
 {
 	if (file->f_mode & FMODE_READ) {
 		struct logger_reader *reader = file->private_data;
+		/*
+		  * 2012.07.02 US730 TD105402 - Kernel Crash while RAM Stress Test - logger_aio_write+0x134/0x380
+		  * it seems that while the list is accessed in fix_up_readers(), if any list member is released the crash wll be met.
+		  * add mutex_lock in order not to delete any list members while they are being accessed.
+		  */
+#ifdef CONFIG_LGE_ANDROID_LOGGER_PATCH
+		struct logger_log *log = reader->log;
+		mutex_lock(&log->mutex);
+#endif
 		list_del(&reader->list);
 		kfree(reader);
+#ifdef CONFIG_LGE_ANDROID_LOGGER_PATCH
+		mutex_unlock(&log->mutex);
+#endif
 	}
 
 	return 0;

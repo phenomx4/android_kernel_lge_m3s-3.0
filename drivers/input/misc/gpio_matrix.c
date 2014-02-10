@@ -138,6 +138,12 @@ static void report_sync(struct gpio_kp *kp)
 		input_sync(kp->input_devs->dev[i]);
 }
 
+//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [Start]	
+#ifdef CONFIG_LGE_DIAG_TESTMODE
+extern int lgf_key_lock;
+#endif
+//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [End]			
+
 static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 {
 	int out, in;
@@ -200,7 +206,16 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		key_index = 0;
 		for (out = 0; out < mi->noutputs; out++)
 			for (in = 0; in < mi->ninputs; in++, key_index++)
+//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [Start]	
+#ifdef CONFIG_LGE_DIAG_TESTMODE
+			{
+				if (!lgf_key_lock)
+					report_key(kp, key_index, out, in);
+			}
+#else
 				report_key(kp, key_index, out, in);
+#endif
+//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [End]			
 		report_sync(kp);
 	}
 	if (!kp->use_irq || kp->some_keys_pressed) {

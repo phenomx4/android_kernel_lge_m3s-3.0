@@ -28,7 +28,12 @@
 #include <linux/msm_rpcrouter.h>
 #include <mach/msm_rpcrouter.h>
 
+// change due to data fault - careful of TIMEREMOTE_PROG_NUMBER
+#ifdef CONFIG_LGE_BOARD_BRINGUP
+#define APP_TIMEREMOTE_PDEV_NAME "rs30000048"
+#else
 #define APP_TIMEREMOTE_PDEV_NAME "rs00000000"
+#endif
 
 #define TIMEREMOTE_PROCEEDURE_SET_JULIAN	6
 #define TIMEREMOTE_PROCEEDURE_GET_JULIAN	7
@@ -794,9 +799,13 @@ static int __init msmrtc_init(void)
 	 * Explicit cast away of 'constness' for driver.name in order to
 	 * initialize it here.
 	 */
+#ifdef CONFIG_LGE_BOARD_BRINGUP
+	// block due to data fault
+#else
 	snprintf((char *)msmrtc_driver.driver.name,
 		 strlen(msmrtc_driver.driver.name)+1,
 		 "rs%08x", TIMEREMOTE_PROG_NUMBER);
+#endif
 	pr_debug("RTC Registering with %s\n", msmrtc_driver.driver.name);
 
 	rc = platform_driver_register(&msmrtc_driver);

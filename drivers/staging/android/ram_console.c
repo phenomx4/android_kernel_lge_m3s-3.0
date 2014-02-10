@@ -40,11 +40,25 @@ struct ram_console_buffer {
 static char __initdata
 	ram_console_old_log_init_buffer[CONFIG_ANDROID_RAM_CONSOLE_EARLY_SIZE];
 #endif
+
+#ifdef CONFIG_LGE_ERS
+char *ram_console_old_log;
+size_t ram_console_old_log_size;
+#else /*CONFIG_LGE_ERS*/
 static char *ram_console_old_log;
 static size_t ram_console_old_log_size;
+#endif /*CONFIG_LGE_ERS*/
 
 static struct ram_console_buffer *ram_console_buffer;
 static size_t ram_console_buffer_size;
+
+#ifdef CONFIG_LGE_ERS
+inline struct ram_console_buffer *get_ram_console_buffer(void)
+{
+	return ram_console_buffer;
+}
+#endif /*CONFIG_LGE_ERS*/
+
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION
 static char *ram_console_par_buffer;
 static struct rs_control *ram_console_rs_decoder;
@@ -143,7 +157,12 @@ ram_console_write(struct console *console, const char *s, unsigned int count)
 static struct console ram_console = {
 	.name	= "ram",
 	.write	= ram_console_write,
+// Do not reprint buffer
+#ifdef CONFIG_LGE_ERS
+	.flags	= CON_ENABLED,
+#else /*origin*/
 	.flags	= CON_PRINTBUFFER | CON_ENABLED,
+#endif /*CONFIG_LGE_ERS*/
 	.index	= -1,
 };
 
@@ -381,6 +400,17 @@ static int __init ram_console_module_init(void)
 	return err;
 }
 #endif
+
+// clear the signal in order not to create last_kmsg on the next boot-up in case power off
+#ifdef CONFIG_LGE_RAM_CONSOLE_CLEAN
+void ram_console_clean_buffer(void)
+{
+	struct ram_console_buffer *buffer = ram_console_buffer;
+	buffer->sig = 0;
+	//memset(ram_console_buffer, 0, ram_console_buffer_size);
+}
+EXPORT_SYMBOL(ram_console_clean_buffer);
+#endif /*CONFIG_LGE_RAM_CONSOLE_CLEAN*/
 
 static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 				    size_t len, loff_t *offset)
