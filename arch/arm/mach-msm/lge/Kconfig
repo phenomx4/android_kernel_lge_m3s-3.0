@@ -1,0 +1,518 @@
+config MACH_LGE
+	default y
+	bool
+
+menu "LGE Board Selection"
+source "arch/arm/mach-msm/lge/Kconfig.board"
+endmenu
+
+menu "LGE Specific Patches"
+
+config LGE_BOARD_BRINGUP
+	tristate "Support LGE Board Bring up"
+	default n
+	depends on MACH_LGE
+	help
+	  LGE Board Bring up fixes
+
+config LGE_REMOVE_UNNECESSARINESS
+	tristate "Remove unnecessary drivers or features"
+	default n
+	depends on MACH_LGE
+	help
+	  Remove unnecessariness
+
+config LGE_USE_6GBIT_SDRAM
+	bool "select to use 6Gbit(768MBytes) SDRAM, default 4Gbit (512MBytes)"
+	default n
+	depends on MACH_LGE
+	help
+	  select SDRAM capacity
+
+config LGE_VERBOSE_LAST_SYSFS_FILE
+	tristate "Support LAST_SYSFS_FILE"
+	default n
+	depends on MACH_LGE
+	help
+	  PRINT OUT LAST_SYSFS_FILE, imported from legacy version
+	  
+config LGE_HANDLE_PANIC
+	tristate "Support LGE Kernel Panic Handler"
+	default n
+	depends on MACH_LGE
+	help
+	  LGE Error handler.
+
+
+config LGE_RAM_CONSOLE
+	bool "Support kmsg save in the ram console area"
+	default n
+	depends on MACH_LGE
+	help
+	  Support kmsg save
+
+config LGE_RAM_CONSOLE_CLEAN
+	bool "Clean ram console"
+	default n
+	help
+	  Clean ram console when powered off normally
+
+config LGE_ERS
+	tristate "Support LGE ERS system"
+	default n
+	depends on LGE_RAM_CONSOLE
+	help
+	  LGE error reporting system
+
+config MACH_LGE_M3S_LCD
+	depends on MACH_LGE_M3S
+	select FB_MSM_LCDC_HW
+	select FB_MSM_MDDI_R61529_HVGA
+	select BACKLIGHT_LM3530
+	bool "MSM7630 M3S LCD porting"
+	help
+	  Support for the LGE MSM7630 M3S LCD.
+
+config MACH_LGE_U0_LCD
+	depends on MACH_MSM7630_U0
+	select FB_MSM_MDDI
+	select FB_MSM_LCDC_HW
+	#select FB_MSM_MDDI_R61529_HVGA
+	select FB_MSM_MDDI_LGIT_WVGA
+	select BACKLIGHT_LM3530
+	bool "MSM7630 U0 LCD porting"
+	help
+	  Support for the LGE MSM7630 M3S LCD.	 
+	  
+config MACH_LGE_U0_KEY
+	depends on MACH_MSM7630_U0
+	bool "MSM7630 U0 LCD porting"
+	help
+	  Support for the LGE MSM7630 U0 KEY.
+
+config LGE_CHARGING_MODE_INFO
+	bool "Support LGE charging mode check"
+	default n 
+	depends on MACH_LGE
+	help
+	 charging mode notification command
+	 
+config LGE_DLOAD_RESET_BOOT_UP
+	bool "Support LGE dload reset check"
+	default n 
+	depends on MACH_LGE
+	help
+	 incase dload reset, do not go into the charging mode
+
+config LGE_SUPPORT_AT_CMD
+        bool "Support LGE AT_CMD system"
+        default n
+        depends on MACH_LGE
+        help
+         LGE AT_CMD Support
+
+config LGE_ATS_ETA
+        bool "Support LGE ATS ETA test"
+        default n
+        depends on LGE_SUPPORT_AT_CMD
+        help
+         Choose if ATS ETA test is required for RAT
+
+config LGE_ATS_INPUT_DEVICE
+        bool "Support LGE ATS input device"
+        default n
+        depends on LGE_SUPPORT_AT_CMD
+        help
+         Choose if use ATS input device used for generating input event from user space
+
+config LGE_ATS_ETA_TIMEOUT
+        bool "Support ETA module timeout"
+        default n
+        depends on LGE_ATS_ETA
+        help
+         set timeout eta module to prevent watchdog reset
+
+config LGE_EMMC_SUPPORT
+	bool "Support LGE eMMC related operations"
+	default n 
+	depends on MACH_LGE
+	help
+	 eMMC read / write operations
+
+config LGE_BT_DEVICE
+	bool "Support LGE BT device"
+	default n 
+	depends on MACH_LGE
+	help
+	 BT gpio, power related feature
+	 
+config LGE_PCB_REVISION
+	int "PCB Revision(0~16)"
+	range 0 16
+	default "9" 
+	depends on MACH_LGE
+	help
+	 Choose PCB Revision(see board_lge.h)
+	 0: Rev0, 1: RevA, 2: RevB, 3: RevC, 4: RevD, 5: RevE,
+	 6: RevF, 7: RevG, 8: RevH
+	 9: Rev1P0 10: Rev1P1 11: Rev1P2 12: Rev1P3 13: Rev1P4
+	 14: Rev1P5 15: Rev1P6 16: Rev1P7
+	 
+config LGE_HW_REVISION
+	bool "HW Revision"
+	default n
+	depends on MACH_LGE
+	help
+	  Reads HW revision from modem(hw revision specified in board_lge.h)
+
+config LGE_SUPPORT_RAPI
+        tristate "Support LGE RAPI"
+        default n
+        depends on MACH_LGE
+        help
+          LGE remote api functions
+
+config MACH_LGE_FUEL_GAUGE
+	bool "MSM7630 U0"
+	help
+	  Support for the LGE MSM7630 U0 USC device.
+
+config MACH_LGE_CHARGING
+	bool "MSM7630 U0"
+	help
+	  Support for the LGE MSM7630 U0 USC device.
+	  
+config LGE_SYNC_CMD
+	bool "Support LGE sync request"
+	default n 
+	depends on MACH_LGE
+	help
+	 sync request command
+
+config LGE_MDDI_TIMER_PATCH
+        depends on MACH_LGE
+        bool "MDDI Host Timer Patch"
+        help
+          Fix for MDDI host timer error.
+
+config LGE_LOG_SERVICE
+	bool "Support LGE log service"
+	depends on MACH_LGE
+	help
+	  Support LGE log service. The author of this patch is cs77.ha@lge.com
+	  
+config LGE_LCD_K_CAL
+	bool "Support LGE LCD K Cal"
+	depends on MACH_LGE
+	---help---                                                 
+	  Enable support for LCD K Cal 	 
+
+config LGE_LCD_DISPLAY_TIMER
+	bool "Support LGE LGE LCD DISPLAY TIMER"
+	depends on MACH_LGE
+	---help---                                                 
+	  Enable support for LGE LCD DISPLAY TIMER	
+	  
+# Below 4 configs is for debugfs function to debug SuspendEarlySuspend
+config LGE_DEBUGFS_SUSPEND
+    tristate "Log about Suspend/EarlySuspend"
+	default y 
+	depends on MACH_LGE
+	help
+	 This patch is for make 2 new nodes to debugfs.
+	 These nodes are:
+	 /sys/kernel/debug/suspend_stats
+	 /sys/kernel/debug/earlysuspend_stats
+
+config LGE_SUSPEND_TIME
+    tristate "Log time spent in suspend"
+    default y
+    depends on LGE_DEBUGFS_SUSPEND
+	help
+	  Prints the time spent in suspend in the kernel log, and
+	  keeps statistics on the time spent in suspend in
+	  /sys/kernel/debug/suspend_time
+
+	  This patch serves same function with google's suspend_time.c
+
+config LGE_EARLYSUSPEND_FUNC_TIME
+    tristate "Log time spent in each earlysuspend call"
+    default y
+    depends on LGE_DEBUGFS_SUSPEND
+	help
+	  Keeps the time statistics spent in each earlysuspend in 
+	  /sys/kernel/debug/earlysuspend_func_time.
+	  This file shows the average and max tiem of each 
+	  earlysuspend/lateresume function.
+
+config LGE_SUSPEND_AUTOTEST
+    tristate "Test suspend/resume and earlysuspend/lateresume automatically"
+    default y
+    depends on MACH_LGE && SUSPEND && EARLYSUSPEND
+	help
+      This option will let you suspend your machine, and make it wake up
+	  a few seconds later using an timer automatically.  
+	  Enable this with a kernel parameter by sysfs.
+
+config LGE_UART_MODE
+	bool "Support LGE UART ENABLE DISABLE"
+	default n 
+	depends on SERIAL_MSM_CONSOLE
+	help
+	 UART ENABLE DISABLE HANDLING
+
+config LGE_DLOAD_FACTORY_RESET
+	bool "Support LGE DLOAD UPGRADE RELATED FUNCTIONS"
+	default n 
+	depends on MACH_LGE
+	help
+	 LGE DLOAD UPGRADE RELATED FUNCTIONS
+
+endmenu
+# endmenu of LGE Specific Patches
+      
+menu "LGE Diag command Specific"
+
+config LGE_DIAG
+        tristate "Support LGE diag test mode"
+        default n
+        depends on MACH_LGE
+        select LGE_SUPPORT_RAPI
+        help
+          LGE diag test mode
+
+config LGE_DIAG_MTC
+	tristate "Support LGE diag MTC"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag MTC enable
+	  
+config LGE_DIAG_WMC
+        bool "Support LGE diag WMC"
+        default n
+        depends on LGE_DIAG
+        help
+          LGE diag WMC enable
+
+config LGE_DIAG_TESTMODE
+	bool "Support LGE diag TESTMODE"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag TESTMODE enable
+
+config LGE_DIAG_LCDQTEST
+	bool "Support LGE diag LCD Q-TEST"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD Q-TEST enable
+
+config LGE_DIAG_KEYPRESS
+	bool "Support LGE diag KEYPRESS"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD KEYPRESS enable
+
+config LGE_DIAG_SCREENSHOT
+	bool "Support LGE diag SCREENSHOT"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD SCREENSHOT enable
+	  
+config LGE_DIAG_WIFI
+	bool "Support LGE diag WIFI"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD WIFI enable
+	  
+config LGE_DIAG_UDM
+	bool "Support LGE diag UDM"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD UDM enable	  	  
+
+config LGE_DIAG_ICD
+	bool "Support LGE diag ICD"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD ICD enable
+
+config LGE_DIAG_SRD
+	bool "Support LGE diag SRD"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag LCD SRD enable
+
+config LGE_DIAG_ATS_ETA_MTC_KEY_LOGGING
+	tristate "Support LGE diag test mode"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag test mode
+
+config LGE_DIAG_FTM_MODE
+	tristate "Support LGE diag test mode"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag ftm mode of test mode
+	  
+config LGE_DIAG_USB_ACCESS_LOCK
+	tristate "Support LGE diag usb lock command"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag ftm mode of test mode
+	  
+config LGE_DIAG_MFT
+	tristate "Support LGE diag usb lock command"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag ftm mode of test mode
+	  
+config LGE_USB_EXPORT_SERIAL_NUMBER
+	tristate "Support Slate Command"
+	default n
+	depends on LGE_DIAG
+	help
+	  LGE diag slate of test mode
+	  
+# LGE_CHANGE_S [yckim.kim@lge.com] 2012.03.28, LG_FW_ANDROID_USB_GADGET
+config LGE_USB_GADGET_SUPPORT_FACTORY_USB
+	tristate "USB Gadget Support LGE Factory USB"
+	depends on USB_GADGET
+	help
+	  Supports LG USB driver
+	default n
+
+config LGE_USB_ACCESS_LOCK
+	bool "Support USB ACCESS LOCK"
+	depends on LGE_EMMC_SUPPORT
+	help
+	  USB ACCESS LOCK BACKUP
+	default n
+
+endmenu
+
+menu "LGE Audio Device"
+
+config LGE_AUDIO
+    bool "Enable LGE Audio Device"
+    default n
+        
+config LGE_PMIC_VIBRATOR
+        bool "Support LGE PMIC Vibrator"
+        default n
+        depends on (LGE_AUDIO && PMIC8058 && !PMIC8058_VIBRATOR)
+        help
+         LGE PMIC Vibrator Driver
+         
+config LGE_HEADSET_2WIRE_DETECT
+        bool "Support H2W Headset"
+        default n
+        depends on (LGE_AUDIO && SWITCH)
+        help
+         LGE 3/4 Pole Headset Detect Driver
+
+config LGE_AUDIO_HEADSET_PROTECT
+        bool "Support Headset Protect Enable"
+        default n
+        depends on LGE_HEADSET_2WIRE_DETECT
+        help
+         Headset Mic Enable Control
+         
+config LGE_AMP_TPA2055D3
+        bool "Support LGE TPA2055D3 Audio Amp"
+        default n
+        depends on LGE_AUDIO
+        help
+         LGE TI TPA2055D3 Audio Amp Driver
+
+config LGE_RCV_SPK_SWITCH
+        bool "Support LGE RCV_SPK Switch"
+        default n
+        depends on LGE_AUDIO
+        help
+         Choose If  external receiver/speaker switch is used
+         
+endmenu
+
+menu "LGE Camera Device"
+
+config MSM_CAMERA
+	depends on ARCH_MSM7X30
+	bool "MSM7630 U0"
+	help
+	  Support for the LGE MSM7630 U0 device.
+
+config S5K4E1
+	depends on MSM_CAMERA
+	bool "MSM7630 U0"
+	help
+	  Support for the LGE MSM7630 U0 device.
+
+# LGE_CHANGE_S : VGA Camera config
+# Camera sensor configuration has been changed for VGA
+config MT9V113
+	depends on MSM_CAMERA
+	bool "Sensor mt9v113 (VGA)"
+	default y
+	---help---
+	  APTINA VGA YUV Sensor
+# LGE_CHANGE_E : VGA Camera config
+
+config VTCAM_SD_IMAGE_TUNNING_FOR_MT9V113
+	bool "SD Card Image Tuning for MT9V113"
+	depends on MT9V113
+	---help---
+	SD Card Image Tuning for MT9V113
+
+config MSM_CAMERA_FLASH                         
+	bool "Qualcomm MSM camera flash support"
+	depends on MSM_CAMERA                   
+	default y                               
+	---help---                              
+	  Enable support for LED flash for msm camera
+	  
+config MSM_CAMERA_FLASH_LM3559                                                
+	bool "MSM camera LM3559 flash support"                                
+	depends on MSM_CAMERA                                                 	  
+	default n                                                             	  
+	---help---                                                            	  
+	  Enable support for NSC LM3559 flash for msm camera.
+	  
+config MSM_GEMINI                                                  
+	tristate "Qualcomm MSM Gemini Jpeg Engine support"         
+	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60)    
+	default M                                                  
+	---help---                                                 
+	  Enable support for Gemini Jpeg Engine
+
+config MSM_VPE                                                     
+	tristate "Qualcomm MSM Video Pre-processing Engine support"
+	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60)    
+	default y                                                  
+	---help---                                                 
+	  Enable support for Video Pre-processing Engine    
+                                                                   
+config QUP_EXCLUSIVE_TO_CAMERA                                     
+	bool "QUP exclusive to camera"                             
+	depends on MSM_CAMERA                                      
+	default y                                                  
+	---help---                                                 
+	  This flag enabled states that QUP                        
+	  is exclusive to camera. In case this                     
+	  is disabled, the lvs1 voltage is enabled                 
+	  by QUP in the board file as QUP is used by               
+	  applications other than camera.  
+	  
+endmenu

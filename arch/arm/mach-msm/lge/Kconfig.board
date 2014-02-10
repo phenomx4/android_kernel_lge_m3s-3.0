@@ -1,0 +1,39 @@
+config BOARD_HEADER_FILE
+	string "LGE board specific header file name"
+	default ""
+
+config MACH_MSM7630_U0
+	depends on ARCH_MSM7X30 
+	bool "MSM7630 U0"
+	help
+	  Support for the LGE MSM7630 U0 device.
+	  
+config MACH_MSM7630_M3S
+	depends on ARCH_MSM7X30 
+	bool "MSM7630 M3S"
+	help
+	  Support for the LGE MSM7630 M3S device.
+
+choice
+	depends on MACH_MSM7630_U0
+	prompt "U0 Board Selection"
+	default MACH_MSM7630_U0_CDMA
+
+config MACH_MSM7630_U0_CDMA
+	bool "MSM7630 U0 CDMA"
+	help
+	  Support for the LGE MSM7630 U0 CDMA device.
+	  
+config MACH_MSM7630_M3S_CDMA
+	bool "MSM7630 M3S CDMA"
+	help
+	  Support for the LGE MSM7630 M3S CDMA device.
+
+config MACH_LGE_M3S
+	depends on ARCH_MSM7X30 
+	select MACH_LGE
+	bool "MSM7630 M3S"
+	help
+	  Support for the LGE MSM7630 M3S device.
+
+endchoice
