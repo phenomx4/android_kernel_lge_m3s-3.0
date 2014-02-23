@@ -39,18 +39,21 @@ keycode_trans_type keytrans_table[KEY_TRANS_MAP_SIZE]={
 /* index = 7 */	{0x37, KEY_7},	
 /* index = 8 */	{0x38, KEY_8},	
 /* index = 9 */	{0x39, KEY_9},	
-/* index = 10 */	{0x2A, KEY_NUMERIC_STAR},	
-/* index = 11 */	{0x23, KEY_NUMERIC_POUND},
-/* index = 12 */	{0x50, KEY_SEND},
-/* index = 13 */	{0x51, KEY_END},
-/* index = 14 */	{0x52, KEY_CLEAR},
+/* index = 10 */	{0x2A, V_KEY_STAR},	
+/* index = 11 */	{0x23, V_KEY_POUND},
+/* index = 12 */	{0x50, KEY_HOME},		
+/* index = 13 */	{0x51, KEY_MENU},	
+/* index = 14 */	{0x52, KEY_BACK},
 /* index = 15 */	{0x53, KEY_SEARCH},
-/* index = 16 */	{0x96, KEY_VOLUMEUP},
-/* index = 17 */	{0x97, KEY_VOLUMEDOWN},
-				{0x4E, KEY_HOME},
-				{0x4F, KEY_MENU},
-				{0x8F, KEY_CAMERA},
-
+/* index = 16 */	{0x73, KEY_VOLUMEUP},
+/* index = 17 */	{0x72, KEY_VOLUMEDOWN},
+/* index = 18 */	{0x74, KEY_POWER},
+/* index = 19 */	{0x60, KEY_SEND},
+/* index = 20 */	{0x61, KEY_SEND},
+					//{0x62, KEY_LEFT},
+					//{0x63, KEY_RIGHT},
+					//{0x64, KEY_UP},
+					//{0x65, KEY_DOWN},
 };
 unsigned int LGF_KeycodeTrans(word input)
 {
@@ -85,10 +88,7 @@ void SendKey(unsigned int keycode, unsigned char bHold)
   struct input_dev *idev = get_ats_input_dev();
 
   if( keycode != HS_RELEASE_K)
-  {
     input_report_key( idev,keycode , 1 ); // press event
-	input_sync(idev);
-  }
 
   if(bHold)
   {
@@ -97,15 +97,9 @@ void SendKey(unsigned int keycode, unsigned char bHold)
   else
   {
     if( keycode != HS_RELEASE_K)
-    {
       input_report_key( idev,keycode , 0 ); // release  event
-      input_sync(idev);
-    }
     else
-    {
       input_report_key( idev,saveKeycode , 0 ); // release  event
-      input_sync(idev);
-    }
   }
 }
 
@@ -119,9 +113,7 @@ void LGF_SendKey(word keycode)
 		printk("%s: input device addr is NULL\n",__func__);
 	
 	input_report_key(idev,(unsigned int)keycode, 1);
-	input_sync(idev);
 	input_report_key(idev,(unsigned int)keycode, 0);
-	input_sync(idev);
 }
 
 EXPORT_SYMBOL(LGF_SendKey);
@@ -138,10 +130,6 @@ PACK (void *)LGF_KeyPress (
   rsp_ptr = (DIAG_HS_KEY_F_rsp_type *) diagpkt_alloc( DIAG_HS_KEY_F, rsp_len );
   if (!rsp_ptr)
   	return 0;
-
-  rsp_ptr->command_code = req_ptr->command_code;
-  rsp_ptr->key = req_ptr->key;
-  rsp_ptr->hold = req_ptr->hold;
 
   if((req_ptr->magic1 == 0xEA2B7BC0) && (req_ptr->magic2 == 0xA5B7E0DF))
   {

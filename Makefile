@@ -158,6 +158,8 @@ VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
 export srctree objtree VPATH
 
+# LGE_CHANGE [2011.07.07] M3S build operation : Default to ARM
+ARCH = arm
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
@@ -374,7 +376,7 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -w -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
@@ -619,50 +621,17 @@ ifdef CONFIG_DYNAMIC_FTRACE
 		export BUILD_C_RECORDMCOUNT
 	endif
 endif
-endif
 
 #if any feature should be set in the release mode, define here.
 ifeq ($(TARGET_BUILD_VARIANT),user)
 KBUILD_CFLAGS	+=-DCONFIG_LGE_FEATURE_RELEASE
+endif
 endif
 
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
 KBUILD_CFLAGS += $(call cc-option, -fno-inline-functions-called-once)
 endif
-#LGE_CHANGE_S [START]2012.3.30 jaeho.cho@lge.com condition for autorun enable/disable
-ifdef CONFIG_LGE_USB_AUTORUN_ENABLE
-ifeq ($(TARGET_PRODUCT),u0_cdma_usc_us)
-KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN
-KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN_LGE
-endif
-
-ifeq ($(TARGET_PRODUCT),u0_cdma_bm_us)
-KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN
-KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_ANDROID_AUTORUN_LGE
-KBUILD_CFLAGS += -DCONFIG_USB_G_LGE_SERIALNO_REDIRECTION
-endif
-endif
-#LGE_CHANGE_S [END]2012.3.30 jaeho.cho@lge.com condition for autorun enable/disable
-
-#LGE_CHANGE_S [START] 2012.05.30 choongnam.kim@lge.com to enable USBLOCK
-ifeq ($(TARGET_PRODUCT),u0_cdma_trf_us)
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION 
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_PERMANENT_LOCK
-KBUILD_CFLAGS += -DCONFIG_LGE_USB_ACCESS_LOCK_INODE
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USBLOCK_EFS_SYNC
-endif
-ifeq ($(TARGET_PRODUCT),u0_cdma_bm_us)
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USB_ACCESS_LOCK_SHA1_ENCRYPTION 
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_ENABLE_INODE
-KBUILD_CFLAGS += -DCONFIG_LGE_DIAG_USBLOCK_EFS_SYNC
-#LGE_CHANGE_S [START]2012.6.29 jaeho.cho@lge.com change mode by usbmode-manager
-KBUILD_CFLAGS += -DCONFIG_LGE_USB_CHANGE_MODE_USERSPACE
-#LGE_CHANGE_S [END]2012.6.29 jaeho.cho@lge.com change mode by usbmode-manager
-endif
-#LGE_CHANGE_S [END] 2012.05.30 choongnam.kim@lge.com to enable USBLOCK
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)

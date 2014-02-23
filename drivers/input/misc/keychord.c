@@ -15,6 +15,8 @@
  *
 */
 
+#ifndef CONFIG_LGE_FEATURE_RELEASE
+
 #include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -385,3 +387,5 @@ static void __exit keychord_exit(void)
 
 module_init(keychord_init);
 module_exit(keychord_exit);
+
+#endif /*CONFIG_LGE_FEATURE_RELEASE*/

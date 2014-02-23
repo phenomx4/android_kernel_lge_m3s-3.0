@@ -17,7 +17,6 @@
 #define TEST_MISC_DRVR 0
 /* LEG_FW_AUDIO  END  */
 
-
 /* Define sound device capability */
 #define SNDDEV_CAP_RX 0x1 /* RX direction */
 #define SNDDEV_CAP_TX 0x2 /* TX direction */
@@ -36,9 +35,12 @@
 #define SNDDEV_DEV_VOL_ANALOG   0x2  /* Codec Analog volume control */
 
 #define SIDE_TONE_MASK	0x01
+
 /* LEG_FW_AUDIO  */
 #if TEST_MISC_DRVR
 int audio_misc_driver_test(unsigned int test_fn);
 #endif
 /* LEG_FW_AUDIO  END  */
+
+
 #endif /* _MACH_QDSP5_V2_AUDIO_DEF_H */

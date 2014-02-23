@@ -34,7 +34,7 @@
 #include <mach/board_lge.h>
 #include <linux/platform_data/lge_android_usb.h>
 
-#include CONFIG_BOARD_HEADER_FILE
+
 #endif
 /* LGE_CHANGE_S [START] 2012.2.26 jaeho.cho@lge.com support factory usb of the chipset below MSM8X60 */
 #ifdef CONFIG_LGE_USB_FACTORY_BELOW_MSM8X60

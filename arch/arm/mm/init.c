@@ -382,9 +382,20 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);
 #else
+	/*
+	 * BOARD_KERNEL_PAGESIZE : 4096 => __pa(_sdata) : 0x00208000, size : 0x014E9F28
+	 * if the size is over ramdisk_addr defined in mkbootimg.c, increase the ramdisk_addr
+	 */
 	memblock_reserve(__pa(_stext), _end - _stext);
+	printk(KERN_INFO "%s start(pa) : 0x%X, size : 0x%X\n", __func__, (int)__pa(_stext), (int)(_end - _stext));
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
+/*
+ * CONFIG_LGE_BOARD_BRINGUP
+ * parse_tag_initrd2 phys_initrd_start : 0x1400000, phys_initrd_size : 0x2CE41
+ * INITRD: 0x01400000+0x0002ce41 overlaps in-use memory region - disabling initrd
+ * change ramdisk_addr to base + 0x01600000 in system\core\mkbootimg\mkbootimg.c
+ */
 	if (phys_initrd_size &&
 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",

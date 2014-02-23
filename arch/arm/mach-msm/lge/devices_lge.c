@@ -55,7 +55,7 @@
 #include "../devices.h"
 #include "../clock-7x30.h"
 #include "../gpio_hw.h"
-#include "../pm.h"
+#include "pm.h"
 
 /* lge gpio i2c device */
 #define MAX_GPIO_I2C_DEV_NUM	20
@@ -79,20 +79,28 @@ void __init lge_add_gpio_i2c_device(gpio_i2c_init_func_t *init_func,struct gpio_
 	struct gpio_i2c_pin *pPrev;
 
 	if(!gpio)
+	{
+		printk(KERN_ERR "%s NULL gpio\n", __func__);
 		return;
+	}
 
 	found = 0;
 	for (index = 0; index < add_gpio.i2c_add_cnt; index++) {
 		pPrev = add_gpio.gpio_i2c_pin_data[index];
 		if(!pPrev)
+		{
+			printk(KERN_ERR "%s NULL pPrev\n", __func__);
 			break;
+		}
 		if(pPrev->sda_pin==gpio->sda_pin){
+			printk(KERN_INFO "%s found the same sda : %d\n", __func__, gpio->sda_pin);
 			found =1;
 			add_gpio.i2c_bus_num_data[add_gpio.i2c_add_cnt] = add_gpio.i2c_bus_num_data[index];
 			break;
 		}
 	}
 	if(found==0){
+		printk(KERN_INFO "%s not found\n", __func__);
 		add_gpio.i2c_bus_num_data[add_gpio.i2c_add_cnt] = LOWEST_GPIO_I2C_BUS_NUM + add_gpio.i2c_dev_num;
 		add_gpio.i2c_bus_init_flag[add_gpio.i2c_add_cnt]=1;
 		add_gpio.i2c_dev_num++;
@@ -142,6 +150,30 @@ int init_gpio_i2c_pin(struct i2c_gpio_platform_data *i2c_adap_pdata,
 
 	return 0;
 }
+
+/* setting whether uart console is enalbed or disabled */
+#ifdef CONFIG_MACH_LGE_M3S
+static int uart_console_mode = 0;
+
+int __init lge_get_uart_mode(void)
+{
+	return uart_console_mode;
+}
+
+static int __init lge_uart_mode(char *uart_mode)
+{
+	if (!strncmp("uart_enable", uart_mode, strlen("uart_enable"))) {
+		printk(KERN_INFO"UART CONSOLE : enable\n");
+		uart_console_mode = 1;
+	} 
+	else 
+		printk(KERN_INFO"UART CONSOLE : disable\n");
+
+	return 1;
+}
+
+__setup("uart.mode=", lge_uart_mode);
+#endif
 
 // matthew.choi@lge.com 111026 add virtual keyboard for at cmd [START]
 #if 1 //def CONFIG_ATCMD_VIRTUAL_KBD

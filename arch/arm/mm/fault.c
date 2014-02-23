@@ -166,25 +166,27 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 */
 	bust_spinlocks(1);
 
+
 #ifdef CONFIG_LGE_ERS
 	memset(panic_msg, 0, 80);
 	sprintf(panic_msg, 
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL dereference" :
 		"paging request", addr);
-#else
+#else /*CONFIG_LGE_ERS*/
 	printk(KERN_ALERT
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
 		"paging request", addr);
-#endif
+#endif /*CONFIG_LGE_ERS*/
 
 	show_pte(mm, addr);
 #ifdef CONFIG_LGE_ERS
 	die(panic_msg, regs, fsr);
-#else
+#else /*CONFIG_LGE_ERS*/
 	die("Oops", regs, fsr);
-#endif
+#endif /*CONFIG_LGE_ERS*/
+
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
 }

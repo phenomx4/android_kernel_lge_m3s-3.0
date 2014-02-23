@@ -336,7 +336,7 @@ static const struct file_operations debug_ops = {
 /* BEGIN: 0014110 jihoon.lee@lge.com 20110115 */
 /* MOD 0014110: [FACTORY RESET] stability */
 /* sync up with oem_rapi */
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_MACH_LGE_M3S
 uint32_t get_oem_rapi_open_cnt(void)
 {
 	return open_count;

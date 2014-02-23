@@ -546,6 +546,23 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				sizeof(struct sensor_eeprom_data_t)))
 				rc = -EFAULT;
 			break;
+// [QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+			case CFG_GET_CALIB_DATA:
+				if (s_ctrl->func_tbl->sensor_get_eeprom_data
+					== NULL) {
+					rc = -EFAULT;
+					break;
+				}
+				rc = s_ctrl->func_tbl->sensor_get_eeprom_data(
+					s_ctrl,
+					&cdata);
+			
+				if (copy_to_user((void *)argp,
+					&cdata,
+					sizeof(cdata)))
+					rc = -EFAULT;
+				break;
+// [QCTK] CALC end keonwoo01.park@lge.com 2012-05-19 from QCT
 
 		default:
 			rc = -EFAULT;

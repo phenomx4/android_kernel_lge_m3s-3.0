@@ -24,6 +24,7 @@
 #include <mach/lge_diagcmd.h>
 #include <mach/lge_diag_testmode.h>
 
+/* BEGIN: 0016311 jihoon.lee@lge.com 20110217 */
 /* ADD 0016311: [POWER OFF] CALL EFS_SYNC */
 #ifdef CONFIG_LGE_SYNC_CMD
 #include <linux/kmod.h>
@@ -31,6 +32,7 @@
 
 #include <mach/oem_rapi_client.h>
 #endif /*CONFIG_LGE_SYNC_CMD*/
+/* END: 0016311 jihoon.lee@lge.com 20110217 */
 
 #define TESTMODE_DRIVER_NAME "testmode"
 
@@ -105,7 +107,7 @@ static ssize_t lg_show_hw_version(struct sys_device *dev,
 	return snprintf(buf, sizeof(hw_pcb_version), "Rev.%s\n", hw_pcb_version);
 }
 
-static DEVICE_ATTR(hw_version, S_IRUGO | S_IRUSR, lg_show_hw_version, NULL);
+static DEVICE_ATTR(hw_version, 0444, lg_show_hw_version, NULL);
 #endif /*CONFIG_LGE_PCB_VERSION*/
 /* END: 0015325 jihoon.lee@lge.com 20110204 */
 
@@ -122,78 +124,36 @@ extern int remote_rpc_request(uint32_t command);
 static struct workqueue_struct *sync_cmd_wq;
 struct __sync_cmd_data {
     unsigned long cmd;
-	unsigned long complete;
     struct work_struct work;
 };
 static struct __sync_cmd_data sync_cmd_data;
 
 static void sync_cmd_func(struct work_struct *work);
 
-static ssize_t request_sync_cmd(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t request_sync_cmd(struct device *dev, struct device_attribute *attr, char *buf, size_t count)
 {
 	unsigned long cmd=0;
 
 	if(buf == NULL)
 	{
-		printk(KERN_ERR "%s NULL buffer\n", __func__);	
+		printk(KERN_ERR "NULL buffer\n");	
 		return 0;
 	}
 
 	cmd = simple_strtoul(buf,NULL,10);
 
 	// request sync through work queue and do not wait the response here, fast return
-	switch(cmd)
+	if (cmd == 1)
 	{
-		case LGE_SYNC_REQUEST:
-		case LGE_DISABLE_EFS_SYNC:
-		case LGE_ENABLE_EFS_SYNC:
-		case LGE_REQUEST_MODEM_FACTORY_RESET:
-		case LGE_REQUEST_ONLINE_MODE:
-			printk(KERN_INFO "%s, received cmd : %ld, activate work queue\n", __func__, cmd);
-			sync_cmd_data.cmd = cmd;
-			sync_cmd_data.complete = 0;
-			queue_work(sync_cmd_wq, &sync_cmd_data.work);
-			break;
-		
-		default :
-			printk(KERN_INFO "%s, unknown cmd : %ld\n", __func__, cmd);
-			break;
+		printk(KERN_INFO "%s, received cmd : %ld, activate work queue\n", __func__, cmd);
+		sync_cmd_data.cmd = cmd;
+		queue_work(sync_cmd_wq, &sync_cmd_data.work);
 	}
 	
-	return cmd;
+	return 0;
 }
 
-static ssize_t response_sync_cmd(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	printk(KERN_INFO "%s, state : %ld\n", __func__, sync_cmd_data.complete);
-	//memcpy(buf, &sync_cmd_data.complete, sizeof(sync_cmd_data.complete));
-	sprintf(buf, "%d\n", (int)(sync_cmd_data.complete));
-	return sizeof(int);
-}
-
-static DEVICE_ATTR(sync_cmd,S_IWUGO |S_IWUSR,response_sync_cmd,request_sync_cmd);
-
-void request_sync_cmd_local(unsigned long cmd)
-{
-	switch(cmd)
-	{
-		case LGE_SYNC_REQUEST:
-		case LGE_DISABLE_EFS_SYNC:
-		case LGE_ENABLE_EFS_SYNC:
-		case LGE_REQUEST_MODEM_FACTORY_RESET:
-		case LGE_REQUEST_ONLINE_MODE:
-			printk(KERN_INFO "%s, received cmd : %ld, activate work queue\n", __func__, cmd);
-			sync_cmd_data.cmd = cmd;
-			sync_cmd_data.complete = 0;
-			queue_work(sync_cmd_wq, &sync_cmd_data.work);
-			break;
-		
-		default :
-			printk(KERN_INFO "%s, unknown cmd : %ld\n", __func__, cmd);
-			break;
-	}
-}
-EXPORT_SYMBOL(request_sync_cmd_local);
+static DEVICE_ATTR(sync_cmd,S_IWUGO |S_IWUSR,NULL,request_sync_cmd);
 
 static void
 sync_cmd_func(struct work_struct *work)
@@ -203,16 +163,11 @@ sync_cmd_func(struct work_struct *work)
 	switch(sync_cmd_data.cmd)
 	{
 		case LGE_SYNC_REQUEST:
-		case LGE_DISABLE_EFS_SYNC:
-		case LGE_ENABLE_EFS_SYNC:
-		case LGE_REQUEST_MODEM_FACTORY_RESET:
-		case LGE_REQUEST_ONLINE_MODE:
 #ifdef CONFIG_LGE_SUPPORT_RAPI
-			if(remote_rpc_request((uint32_t)sync_cmd_data.cmd) < 0)
+			if(remote_rpc_request(LGE_SYNC_REQUEST) < 0)
 				printk(KERN_ERR "%s, rpc request failed\n", __func__);
 			else
 				printk(KERN_INFO "%s, sync request succeeded\n", __func__);
-			sync_cmd_data.complete = 1;
 #endif /*CONFIG_LGE_SUPPORT_RAPI*/
 			break;
 
@@ -222,7 +177,6 @@ sync_cmd_func(struct work_struct *work)
 			printk(KERN_INFO "%s, MANUAL MODE : %s\n", __func__, testmode_manual_mode_info);
 			break;
 #endif /*CONFIG_LGE_FOTA_MISC_INFO*/
-
 		default:
 			printk(KERN_ERR "%s, unknown command : %ld\n", __func__, sync_cmd_data.cmd);
 			break;
@@ -231,6 +185,7 @@ sync_cmd_func(struct work_struct *work)
 	return;
 }
 #endif /*CONFIG_LGE_SYNC_CMD*/
+/* END: 0016311 jihoon.lee@lge.com 20110217 */
 
 #ifdef CONFIG_LGE_FOTA_MISC_INFO
 static char testmode_sw_version_info[50] = "UNKNOWN";
@@ -290,22 +245,6 @@ static ssize_t lg_show_manual_mode_info(struct sys_device *dev,
 static DEVICE_ATTR(manual_mode_info, S_IRUGO | S_IRUSR, lg_show_manual_mode_info, NULL);
 #endif /*CONFIG_LGE_MANUAL_MODE_TEST*/
 
-#ifdef CONFIG_LGE_DIAG_TESTMODE //2012.05.14 yunjeong.kang Testmode 250-116-6
-extern void read_Framebuffer_Testmode(char *path, int x, int y, int w, int h);
-static ssize_t lg_get_lcd(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int x,y,w,h;
-
-	sscanf(buf, "%d %d %d %d", &x, &y, &w, &h);
-	printk(KERN_INFO "%s,  x = %d ,y = %d,  w = %d,  h = %d\n", __func__, x, y, w, h);
-
-	read_Framebuffer_Testmode((char *)NULL, x, y, w, h);
-
-	return count;
-}
-static DEVICE_ATTR(get_lcd, S_IRUGO | S_IRUSR , NULL, lg_get_lcd);
-#endif /*CONFIG_LGE_DIAG_TESTMODE*/
-
 static int __devinit testmode_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -318,6 +257,7 @@ static int __devinit testmode_probe(struct platform_device *pdev)
 	ret = device_create_file(&pdev->dev, &dev_attr_rev_check);
 // END : munho.lee@lge.com 2010-12-10
 
+/* BEGIN: 0016311 jihoon.lee@lge.com 20110217 */
 /* ADD 0016311: [POWER OFF] CALL EFS_SYNC */
 // create file to receive command and generate work queue in order not to make any delays for the request
 #ifdef CONFIG_LGE_SYNC_CMD
@@ -325,6 +265,7 @@ static int __devinit testmode_probe(struct platform_device *pdev)
 	sync_cmd_wq = create_singlethread_workqueue("sync_cmd_wq");
 	INIT_WORK(&sync_cmd_data.work, sync_cmd_func);
 #endif /*CONFIG_LGE_SYNC_CMD*/
+/* END: 0016311 jihoon.lee@lge.com 20110217 */
 
 /* BEGIN: 0015325 jihoon.lee@lge.com 20110204 */
 /* ADD 0015325: [KERNEL] HW VERSION FILE */
@@ -332,10 +273,6 @@ static int __devinit testmode_probe(struct platform_device *pdev)
 	ret = device_create_file(&pdev->dev, &dev_attr_hw_version);
 #endif /*CONFIG_LGE_PCB_VERSION*/
 /* END: 0015325 jihoon.lee@lge.com 20110204 */
-
-#ifdef CONFIG_LGE_DIAG_TESTMODE
-	ret = device_create_file(&pdev->dev, &dev_attr_get_lcd);
-#endif /*CONFIG_LGE_DIAG_TESTMODE*/
 
 #ifdef CONFIG_LGE_FOTA_MISC_INFO
 	ret = device_create_file(&pdev->dev, &dev_attr_sw_version_info);
@@ -377,14 +314,12 @@ static int __devexit testmode_remove(struct platform_device *pdev)
 #endif /*CONFIG_LGE_PCB_VERSION*/
 /* END: 0015325 jihoon.lee@lge.com 20110204 */
 
-#ifdef CONFIG_LGE_DIAG_TESTMODE
-	device_remove_file(&pdev->dev, &dev_attr_get_lcd);
-#endif /*CONFIG_LGE_DIAG_TESTMODE*/
-
+/* BEGIN: 0016311 jihoon.lee@lge.com 20110217 */
 /* ADD 0016311: [POWER OFF] CALL EFS_SYNC */
 #ifdef CONFIG_LGE_SYNC_CMD
   device_remove_file(&pdev->dev, &dev_attr_sync_cmd);
 #endif /*CONFIG_LGE_SYNC_CMD*/
+/* END: 0016311 jihoon.lee@lge.com 20110217 */
 
 #ifdef CONFIG_LGE_FOTA_MISC_INFO
   device_remove_file(&pdev->dev, &dev_attr_sw_version_info);

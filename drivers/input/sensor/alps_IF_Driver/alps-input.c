@@ -3,6 +3,9 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/input-polldev.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #include <asm/uaccess.h>
 #include <linux/miscdevice.h>
@@ -23,13 +26,19 @@ extern int accsns_get_acceleration_data(int *xyz);
 extern int hscd_get_magnetic_field_data(int *xyz);
 extern void hscd_activate(int flgatm, int flg, int dtime);
 extern void accsns_activate(int flgatm, int flg);
-extern int hscd_self_test_A(void);
-extern int hscd_self_test_B(void);
+//Compass Testmode 
+extern void mode_control(int mode);
+extern int get_mode(void);
+//Compass Testmode
+
 
 static DEFINE_MUTEX(alps_lock);
 
 static struct platform_device *pdev;
 static struct input_polled_dev *alps_idev;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static struct early_suspend alps_early_suspend_handler;
+#endif
 
 #define EVENT_TYPE_ACCEL_X          ABS_X
 #define EVENT_TYPE_ACCEL_Y          ABS_Y
@@ -51,19 +60,44 @@ static struct input_polled_dev *alps_idev;
 
 #define POLL_STOP_TIME		400	/* (msec) */
 
-static int flgM = 0, flgA = 0;
+static int flgM, flgA = 0;
+static int flgSuspend = 0;
 static int delay = 200;
 static int poll_stop_cnt = 0;
 
-static char calibration;
+//Compass & Accel Testmode
+unsigned int hscd_count=0;
+unsigned int accel_count=0;
+static int hscd_count_flag=0;
+static int accel_count_flag=0;
+static char calibration=0;
+
+
+void set_count_flgA(int count_flgA)
+{
+	flgA=count_flgA;
+}
+void set_accel_count_flag(int _accel_count_flag)
+{
+	accel_count_flag=_accel_count_flag;
+	if(flgSuspend==1 && accel_count_flag==0)
+		flgSuspend=1;
+	else if(accel_count_flag==1 || (flgSuspend==0 && accel_count_flag==0))
+		flgSuspend=0;
+}
+void set_accel_count(int _accel_count)
+{
+	accel_count=_accel_count;
+}
+//Compass & Accel Testmode
+
 
 /*****************************************************************************/
 /* for I/O Control */
 
 /* LGE_CHANGE_S [jihyun.seong@lge.com] 2011-05-24,
    replace unlocked ioctl - from kernel 2.6.36.x */
-//static int alps_ioctl(struct inode* inode, struct file* filp, unsigned int cmd, unsigned long arg)
-static long alps_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
+static long alps_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	int ret = -1, tmpval;
@@ -130,38 +164,6 @@ static long alps_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
 #endif
 		break;
 
-	case ALPSIO_ACT_SELF_TEST_A:
-#ifdef ALPS_DEBUG
-	   	printk("alps_ioctl(cmd = ALPSIO_ACT_SELF_TEST_A)\n");
-#endif
-        mutex_lock(&alps_lock);
-        ret = hscd_self_test_A();
-	    mutex_unlock(&alps_lock);
-#ifdef ALPS_DEBUG
-        printk("[HSCD] Self test-A result : %d\n", ret);
-#endif
-        if (copy_to_user(argp, &ret, sizeof(ret))) {
-			printk( "error : alps_ioctl(cmd = ALPSIO_ACT_SELF_TEST_A)\n" );
-			return -EFAULT;
-        }
-		break;
-
-	case ALPSIO_ACT_SELF_TEST_B:
-#ifdef ALPS_DEBUG
-	   	printk("alps_ioctl(cmd = ALPSIO_ACT_SELF_TEST_B)\n");
-#endif
-        mutex_lock(&alps_lock);
-        ret = hscd_self_test_B();
-	    mutex_unlock(&alps_lock);
-#ifdef ALPS_DEBUG
-        printk("[HSCD] Self test-B result : %d\n", ret);
-#endif
-        if (copy_to_user(argp, &ret, sizeof(ret))) {
-			printk( "error : alps_ioctl(cmd = ALPSIO_ACT_SELF_TEST_B)\n" );
-			return -EFAULT;
-        }
-		break;
-
 	default:
 		return -ENOTTY;
 	}
@@ -215,7 +217,7 @@ static ssize_t accsns_position_show(struct device *dev,
 		y = 0;
 		z = 0;
 	}
-	return snprintf(buf, PAGE_SIZE, "accel (%d %d %d)\n", x, y, z);
+	return snprintf(buf, PAGE_SIZE, "(%d %d %d)\n", x, y, z);
 }
 
 static ssize_t hscd_position_show(struct device *dev,
@@ -233,7 +235,60 @@ static ssize_t hscd_position_show(struct device *dev,
 		y = 0;
 		z = 0;
 	}
-	return snprintf(buf, PAGE_SIZE, "hscd (%d %d %d)\n", x, y, z);
+	return snprintf(buf, PAGE_SIZE, "(%d %d %d)\n", x, y, z);
+}
+static ssize_t hscd_x_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	int x, y, z;
+	int xyz[3];
+
+	if (hscd_get_magnetic_field_data(xyz) == 0) {
+		x = xyz[0];
+		y = xyz[1];
+		z = xyz[2];
+	} else {
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	return snprintf(buf, PAGE_SIZE, "%d\n", x);
+}
+
+static ssize_t hscd_y_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	int x, y, z;
+	int xyz[3];
+
+	if (hscd_get_magnetic_field_data(xyz) == 0) {
+		x = xyz[0];
+		y = xyz[1];
+		z = xyz[2];
+	} else {
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	return snprintf(buf, PAGE_SIZE, "%d\n", y);
+}
+
+static ssize_t hscd_z_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	int x, y, z;
+	int xyz[3];
+
+	if (hscd_get_magnetic_field_data(xyz) == 0) {
+		x = xyz[0];
+		y = xyz[1];
+		z = xyz[2];
+	} else {
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	return snprintf(buf, PAGE_SIZE, "%d\n", z);
 }
 
 static ssize_t alps_position_show(struct device *dev,
@@ -246,6 +301,53 @@ static ssize_t alps_position_show(struct device *dev,
 	mutex_unlock(&alps_lock);
 	return cnt;
 }
+
+static ssize_t hscd_enable_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	int enable=0;
+	enable=get_mode();
+	printk("enable show : %d\n", enable);
+	return snprintf(buf, PAGE_SIZE, "%d\n", enable);
+}
+static ssize_t hscd_enable_store(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	int mode=0;
+	
+	sscanf(buf,"%d", &mode);
+	
+	if(mode==0)
+	{
+		mode_control(mode);
+		hscd_count_flag=0;
+		hscd_count=0;
+		flgM=0;
+	}
+	else{
+		mode_control(mode);
+		hscd_count_flag=1;
+		flgM=1;
+	}	
+	if(flgSuspend==1 && hscd_count_flag==0)
+		flgSuspend=1;
+	else if(hscd_count_flag==1 || (flgSuspend==0 && hscd_count_flag==0))
+		flgSuspend=0;
+	return 0;
+}
+static ssize_t hscd_count_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	printk("hscd_count : %d\n", hscd_count);
+	return snprintf(buf, PAGE_SIZE, "%d\n", hscd_count);
+}
+
+static ssize_t accel_count_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	printk("accel_count : %d\n", accel_count);
+	return snprintf(buf, PAGE_SIZE, "%d\n", accel_count);
+}
 static ssize_t alps_calibration_show(struct device *dev, \
 struct device_attribute *attr, char *buf)
 {
@@ -254,15 +356,26 @@ struct device_attribute *attr, char *buf)
 static ssize_t alps_calibration_store(struct device *dev,\
 struct device_attribute *attr, const char *buf, size_t count)
 {
-
     sscanf(buf, "%c", &calibration);
     return 0;
 }
 static DEVICE_ATTR(position, 0444, alps_position_show, NULL);
-static DEVICE_ATTR(calibration, S_IRUGO | S_IWUGO, alps_calibration_show, alps_calibration_store);
+static DEVICE_ATTR(x, 0444, hscd_x_show, NULL);
+static DEVICE_ATTR(y, 0444, hscd_y_show, NULL);
+static DEVICE_ATTR(z, 0444, hscd_z_show, NULL);
+static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR | S_IWGRP , hscd_enable_show, hscd_enable_store);
+static DEVICE_ATTR(count, 0444, hscd_count_show, NULL);
+static DEVICE_ATTR(accel_count, 0444, accel_count_show, NULL);
+static DEVICE_ATTR(calibration,  S_IRUSR|S_IRGRP|S_IWUSR|S_IWGRP, alps_calibration_show, alps_calibration_store);
 
 static struct attribute *alps_attributes[] = {
 	&dev_attr_position.attr,
+	&dev_attr_x.attr,
+	&dev_attr_y.attr,
+	&dev_attr_z.attr,
+	&dev_attr_enable.attr,
+	&dev_attr_count.attr,
+	&dev_attr_accel_count.attr,
 	&dev_attr_calibration.attr,
 	NULL,
 };
@@ -283,6 +396,31 @@ static int alps_remove(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void alps_early_suspend(struct early_suspend *handler)
+{
+#ifdef ALPS_DEBUG
+    printk("alps-input: early_suspend\n");
+#endif
+    printk("alps-input: early_suspend\n");
+    mutex_lock(&alps_lock);
+    flgSuspend = 1;
+    mutex_unlock(&alps_lock);
+}
+
+static void alps_early_resume(struct early_suspend *handler)
+{
+#ifdef ALPS_DEBUG
+    printk("alps-input: early_resume\n");
+#endif
+    printk("alps-input: early_resume\n");
+   mutex_lock(&alps_lock);
+   poll_stop_cnt = POLL_STOP_TIME / delay;
+   flgSuspend = 0;
+   mutex_unlock(&alps_lock);
+}
+#endif
+
 static struct platform_driver alps_driver = {
 	.driver	= {
 		.name = "alps-input",
@@ -291,6 +429,13 @@ static struct platform_driver alps_driver = {
     .probe = alps_probe,
     .remove = alps_remove,
 };
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static struct early_suspend alps_early_suspend_handler = {
+    .suspend = alps_early_suspend,
+    .resume  = alps_early_resume,
+};
+#endif
 
 static void accsns_poll(struct input_dev *idev)
 {
@@ -325,12 +470,22 @@ static void alps_poll(struct input_polled_dev *dev)
 
 	mutex_lock(&alps_lock);
 	dev->poll_interval = delay;
+	if (!flgSuspend) {
 	if (poll_stop_cnt-- < 0) {
 		poll_stop_cnt = -1;
 		if (flgM)
+		{
 			hscd_poll(idev);
+//Testmode 8.7 Start
+			if(hscd_count_flag==1)
+				hscd_count++;
+//Testmode 8.8 End
+			}
 		if (flgA)
+		{
 			accsns_poll(idev);
+			}
+		}
 	}
 /*	else printk("pollinf stop. delay = %d, poll_stop_cnt = %d\n", delay, poll_stop_cnt); */
 	mutex_unlock(&alps_lock);
@@ -402,6 +557,14 @@ static int __init alps_init(void)
 	}
 	printk("alps-init: misc_register\n");
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    register_early_suspend(&alps_early_suspend_handler);
+    printk("alps-init: early_suspend_register\n");
+#endif
+    mutex_lock(&alps_lock);
+    flgSuspend = 0;
+    mutex_unlock(&alps_lock);
+
 	return 0;
 
 exit_misc_device_register_failed:
@@ -423,6 +586,10 @@ out_region:
 
 static void __exit alps_exit(void)
 {
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&alps_early_suspend_handler);
+    printk(KERN_INFO "alps-exit: early_suspend_unregister\n");
+#endif
 	misc_deregister(&alps_device);
 	printk(KERN_INFO "alps-exit: misc_deregister\n");
 	input_unregister_polled_device(alps_idev);

@@ -48,10 +48,29 @@
 
 extern unsigned long ebi1_phys_offset;
 
-#define EBI1_PHYS_OFFSET (ebi1_phys_offset)
+
+
+/*
+ * CONFIG_LGE_BOARD_BRINGUP
+ * M3S 8X55 LIGHT VERSION : EBI1 is dedicated to 0x20000000
+ * if this is not set, __virt_to_phys() will return wrong values that are not accessible.
+ * page fault will be invoked while __flush_dcache_page() in paging_init()
+ */
+/*M7630AABBQMLZA4040305I patch*/
+#if defined (CONFIG_MACH_LGE_M3S)
+#define EBI1_PHYS_OFFSET 0x20000000
+#else
+#define EBI1_PHYS_OFFSET 0x40000000
+#endif
+
+#if defined (CONFIG_LGE_USE_6GBIT_SDRAM)
+#define EBI1_PAGE_OFFSET (EBI0_CS1_PAGE_OFFSET + EBI0_CS1_SIZE)
+#else
 #define EBI1_PAGE_OFFSET (EBI0_PAGE_OFFSET + EBI0_SIZE)
+#endif
 
 #if (defined(CONFIG_SPARSEMEM) && defined(CONFIG_VMSPLIT_3G))
+
 
 #define __phys_to_virt(phys)				\
 	((phys) >= EBI1_PHYS_OFFSET ?			\

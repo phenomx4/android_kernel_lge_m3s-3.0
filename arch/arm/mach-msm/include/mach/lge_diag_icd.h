@@ -35,17 +35,16 @@
 #error No PACK() macro defined for this compiler
 #endif
 /********************** END PACK() Definition *****************************/
+#define LCD_MAIN_WIDTH   320 /*Cayman : 480	  VS920 : 736		VS910 : 480	VS660 : 320 */
+#define LCD_MAIN_HEIGHT  480 /*Cayman : 800	  VS920 : 1280	VS910 : 800	VS660 : 480 */
 
 #define ICD_MAX_STRING 10
 #define ICD_DISP_TEXT_MAX_STRING 300
 #define ICD_MSTR_TBL_SIZE 0xFF
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
-//#define ICD_SCRN_BUF_SIZE_MAX (320*480*(sizeof(unsigned short))) // icd_pixel_16_type, 2bytes
-#define ICD_SCRN_BUF_SIZE_MAX	 LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 2 // icd_pixel_16_type, 2bytes
 #define ICD_SEND_BUF_SIZE		 65536	
 #define ICD_SEND_SAVE_IMG_PATH_LEN 	20//Slate_ADB
+#define ICD_SCRN_BUF_SIZE_MAX	 LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 2 // icd_pixel_16_type, 2bytes
 #define VARIABLE		50
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 typedef enum
 {
 	/** SAR : Sprint Automation Requirement - START **/
@@ -83,10 +82,8 @@ typedef enum
 	ICD_GETLATITUDELONGITUDEVALUES_REQ_CMD	=0X3F,    //Auto-235
 	ICD_GETSCREENLOCKSTATUS_REQ_CMD					=0x40,	//Auto-232
 	ICD_SETSCREENLOCKSTATUS_REQ_CMD					=0x41,	//Auto-239
-//  20111125 [end] suhyun.lee@lge.com SLATE ICD 231,232,238 Merge From LS840 
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [Start]
-	ICD_GETANDROIDIDENTIFIER_REQ_CMD				=0x47, 
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [End]
+//  20111125 [end] suhyun.lee@lge.com SLATE ICD 231,232,238 Merge From LS840
+	ICD_GETANDORIDIDENTIFIER_REQ_CMD				=0x47, 
 	/** ICDR : ICD Implementation Recommendation  - END **/
 
 	ICD_MAX_REQ_CMD									=0xff,
@@ -104,7 +101,6 @@ typedef struct {
 	unsigned char screen_id;
 } PACKED icd_handset_disp_text_req_type;
 
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 //slate ICD type image capture
 typedef enum
 {
@@ -113,15 +109,12 @@ typedef enum
 	ContinueImageNoHeader			= 0x02,
 	ContinueImageHeader				= 0x03,	
 }icd_rsp_flag;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 typedef struct {
 	icd_req_hdr_type hdr;
 	unsigned char screen_id;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	unsigned short expected_width;
 	unsigned short expected_height;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 	unsigned short upper_left_x;
 	unsigned short upper_left_y;
 	unsigned short lower_right_x;
@@ -198,11 +191,9 @@ typedef struct {
 	unsigned char screenlock_status;
 }PACKED icd_set_screenlock_status_req_type;
 
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 typedef struct {
 	icd_req_hdr_type hdr;
 }PACKED icd_get_android_identifier_req_type;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 typedef union
 {
@@ -222,9 +213,7 @@ typedef union
 	icd_set_usbdebug_status_req_type set_usbdebug_status_req_info;
 	icd_get_screenlock_status_req_type get_screenlock_status_req_info;
 	icd_set_screenlock_status_req_type set_screenlock_status_req_info;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	icd_get_android_identifier_req_type get_android_identifier_req_info;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 } PACKED icd_req_type;
 
 typedef union{
@@ -256,10 +245,8 @@ typedef struct {
 typedef struct {
 	icd_req_hdr_type hdr;
 	unsigned char screen_id;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	unsigned short actual_width;
 	unsigned short actual_height;	
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 	unsigned short upper_left_x;
 	unsigned short upper_left_y;
 	unsigned short lower_right_x;
@@ -267,11 +254,10 @@ typedef struct {
 	unsigned char flags;
 	unsigned char bit_per_pixel;
 	unsigned short seq_num;
-	//char image_data_block[ICD_SCRN_BUF_SIZE_MAX];
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
+//	byte image_data_block[ICD_SEND_BUF_SIZE];
 	byte image_data_block[ICD_SEND_SAVE_IMG_PATH_LEN];//Slate_ADB
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 } PACKED icd_screen_capture_rsp_type;
+
 
 typedef struct {
 	icd_req_hdr_type hdr;
@@ -353,13 +339,11 @@ typedef struct {
 
 typedef struct {
 	icd_req_hdr_type hdr;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	char latitude_longitude[20];
 	/*
 	char latitude[5];
 	char longitude[5];
 	*/
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 } PACKED icd_get_latitude_longitude_values_rsp_type;
 
 typedef struct {
@@ -433,12 +417,10 @@ typedef struct {
 	unsigned char cmd_status;
 }PACKED icd_set_screenlock_status_rsp_type;
 //  20111125 [end] suhyun.lee@lge.com SLATE ICD 231,232,238 Merge From LS840 
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 typedef struct {
 	icd_req_hdr_type hdr;
 	char android_id_string[VARIABLE];
 }PACKED icd_get_android_identifier_rsp_type;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 typedef union
 {
@@ -472,9 +454,7 @@ typedef union
 	icd_get_screenlock_status_rsp_type get_screenlock_status_rsp_info;
 	icd_set_screenlock_status_rsp_type set_screenlock_status_rsp_info;
 	icd_get_latitude_longitude_values_rsp_type get_latitude_longitude_values_rsp_info;
-// LGE_CHANGE_S [myeonggyu.son@lge.com] 2011.0221 [gelato] slate ICD command list [START]
 	icd_get_android_identifier_rsp_type get_android_identifier_rsp_info;
-// LGE_CHANGE_S [myeonggyu.son@lge.com] 2011.0221 [gelato] slate ICD command list [End]
 } PACKED icd_rsp_type;
 
 typedef union

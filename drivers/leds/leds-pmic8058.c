@@ -17,6 +17,20 @@
 #include <linux/spinlock.h>
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/leds-pmic8058.h>
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/earlysuspend.h>
+#endif
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
+#include <linux/syscalls.h>
+#include <linux/fcntl.h>
+#include <asm/uaccess.h>
+#ifdef CONFIG_MACH_LGE_M3S
+#include <linux/timer.h>
+#include <linux/jiffies.h>
+#endif
 
 #define SSBI_REG_ADDR_DRV_KEYPAD	0x48
 #define PM8058_DRV_KEYPAD_BL_MASK	0xf0
@@ -46,6 +60,7 @@ struct pmic8058_led_data {
 	int			id;
 	enum led_brightness	brightness;
 	u8			flags;
+	struct pm8058_chip	*pm_chip;
 	struct work_struct	work;
 	struct mutex		lock;
 	spinlock_t		value_lock;
@@ -57,12 +72,81 @@ struct pmic8058_led_data {
 
 #define PM8058_MAX_LEDS		7
 static struct pmic8058_led_data led_data[PM8058_MAX_LEDS];
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+static int g_led_off;	// disable LED on always (Front key LED timeout = always off)
+static int g_led_blink;	// enable LED blinking with missed event and LCD off
+extern void remote_set_led_on_off(int info);
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
+
+#ifdef CONFIG_MACH_LGE_M3S
+static int timer_on = -1;
+
+static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value);
+static void kp_bl_timer_handler(unsigned long data);
+static DEFINE_TIMER(kp_bl_timer, kp_bl_timer_handler, 0, 0);
+
+static void kp_bl_set_timer(void)
+{
+	printk("%s entered!!\n", __func__);
+
+	if (timer_on == 0) {
+		mod_timer(&kp_bl_timer,	jiffies + (HZ * 29 / 2));
+		printk(KERN_INFO "[matthew] %s: LED will be turned on after 14.5 sec\n", __func__);
+		timer_on = 1;
+	} else if (timer_on == 1) {
+		mod_timer(&kp_bl_timer,	jiffies + (HZ / 2));
+		printk(KERN_INFO "[matthew] %s: LED will be turned off after 0.5 sec\n", __func__);
+		timer_on = 0;
+	}
+}
+
+static void kp_bl_timer_handler(unsigned long data)
+{
+	printk("[matthew] %s entered!!\n", __func__);
+
+	if (timer_on == 1) {
+		kp_bl_set(&led_data[PMIC8058_ID_LED_KB_LIGHT], 1);
+		kp_bl_set_timer();
+	} else if (timer_on == 0) {
+		kp_bl_set(&led_data[PMIC8058_ID_LED_KB_LIGHT], 0);
+		kp_bl_set_timer();
+	}
+}
+#endif
 
 static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
 {
 	int rc;
 	u8 level;
 	unsigned long flags;
+	char usb_chg_type[32] = {0, };
+	int fd;
+	mm_segment_t old_fs = get_fs();
+
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+	if(value != 0)
+	{
+		if(g_led_off == 1) {
+			printk("%s : Key LED is disable now\n", __FUNCTION__);
+			return;
+		}
+
+		set_fs(KERNEL_DS);
+		fd = sys_open("/sys/devices/platform/msm_hsusb/gadget/chg_type", O_RDONLY, 0);
+		if (fd > 0) {
+			sys_read(fd, usb_chg_type, sizeof(usb_chg_type));
+			sys_close(fd);
+		}
+		set_fs(old_fs);
+
+		// start LED blink timer when not in charging state
+		if (g_led_blink == 1 && strcmp(usb_chg_type, "INVALID") == 0) {
+			remote_set_led_on_off(1);
+		}
+	}
+
+	printk("[matthew] %s value : %d, blink = %d, timer_state = %d\n", __FUNCTION__, value, g_led_blink, timer_on);
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
 
 	spin_lock_irqsave(&led->value_lock, flags);
 	level = (value << PM8058_DRV_KEYPAD_BL_SHIFT) &
@@ -92,6 +176,8 @@ static void led_lc_set(struct pmic8058_led_data *led, enum led_brightness value)
 	unsigned long flags;
 	int rc, offset;
 	u8 level, tmp;
+
+//printk(" \n led_lc_set = %d \n ",value);
 
 	spin_lock_irqsave(&led->value_lock, flags);
 
@@ -238,12 +324,16 @@ static void pmic8058_led_set(struct led_classdev *led_cdev,
 	struct pmic8058_led_data *led;
 	unsigned long flags;
 
+//printk(" \n pmic8058_led_set value is %d ,before is %d\n",value,led->brightness);
+
 	led = container_of(led_cdev, struct pmic8058_led_data, cdev);
 
 	spin_lock_irqsave(&led->value_lock, flags);
 	led->brightness = value;
 	schedule_work(&led->work);
 	spin_unlock_irqrestore(&led->value_lock, flags);
+//printk(" \n pmic8058_led_set value is %d ,before is %d\n",value,led->brightness);
+	
 }
 
 static void pmic8058_led_work(struct work_struct *work)
@@ -287,6 +377,42 @@ static enum led_brightness pmic8058_led_get(struct led_classdev *led_cdev)
 	}
 	return LED_OFF;
 }
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+static ssize_t store_led_off(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	g_led_off = simple_strtoul(buf, NULL, 10);
+
+	return size;
+}
+
+static ssize_t show_led_blink(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_led_blink);
+}
+
+static ssize_t store_led_blink(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+
+	if ((g_led_blink = simple_strtoul(buf, NULL, 10)) == 0)
+		remote_set_led_on_off(0);
+//	else
+//		kp_bl_set(&led_data[PMIC8058_ID_LED_KB_LIGHT], 1);
+
+	return size;
+}
+static DEVICE_ATTR(led_off, S_IRUGO | S_IWUSR, NULL, store_led_off);
+static DEVICE_ATTR(led_blink, S_IRUGO | S_IWUSR, show_led_blink, store_led_blink);
+
+static struct attribute *pmic8058_led_attributes[] = {
+	&dev_attr_led_off.attr, 
+	&dev_attr_led_blink.attr, 
+	NULL
+};
+
+static const struct attribute_group pmic8058_led_group = {
+	.attrs = pmic8058_led_attributes,
+};
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
 
 static int pmic8058_led_probe(struct platform_device *pdev)
 {
@@ -294,10 +420,17 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 	struct pmic8058_led_data *led_dat;
 	struct pmic8058_led *curr_led;
 	int rc, i = 0;
+	struct pm8058_chip	*pm_chip;
 	u8			reg_kp;
 	u8			reg_led_ctrl[3];
 	u8			reg_flash_led0;
 	u8			reg_flash_led1;
+
+	pm_chip = platform_get_drvdata(pdev);
+	if (pm_chip == NULL) {
+		dev_err(&pdev->dev, "no parent data passed in\n");
+		return -EFAULT;
+	}
 
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "platform data not supplied\n");
@@ -372,6 +505,12 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 		}
 	}
 
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+	rc = sysfs_create_group(&pdev->dev.kobj, &pmic8058_led_group);
+	if(rc)
+		printk("[LED_PMIC8058] sysfs create group error\n");
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
+
 	platform_set_drvdata(pdev, led_data);
 
 	return 0;
@@ -395,6 +534,9 @@ static int __devexit pmic8058_led_remove(struct platform_device *pdev)
 		led_classdev_unregister(&led[led->id].cdev);
 		cancel_work_sync(&led[led->id].work);
 	}
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [START]
+	sysfs_remove_group(&pdev->dev.kobj,&pmic8058_led_group);
+// matthew.choi@lge.com 111217 add early suspend for Keypad backlight [END]
 
 	return 0;
 }

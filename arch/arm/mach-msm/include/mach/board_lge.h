@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ASM_ARCH_MSM_BOARD_LGE_H
-#define __ASM_ARCH_MSM_BOARD_LGE_H
+#ifndef __ASM_ARCH_MSM_BOARD_M3S_H
+#define __ASM_ARCH_MSM_BOARD_M3S_H
 
 #include <linux/types.h>
 #include <linux/list.h>
@@ -22,37 +22,9 @@
 #include <linux/platform_device.h>
 #include <asm/setup.h>
 
-//LGE_CHANGE_S[TestMode][jinhwan.do@lge.com] 2012-02-14, SD Card Patch from LS696 for TestMode [Start]
-// SD Card GPIO layout
-#define SYS_GPIO_SD_DET		42
-//LGE_CHANGE_S[TestMode][hongsic.kim@lge.com] 2012-04-10, TESTMODE CMD ADD Earjack_check porting [Start]
-#define SYS_GPIO_EARJACK_DET	26
-//LGE_CHANGE_S[TestMode][hongsic.kim@lge.com] 2012-04-10, TESTMODE CMD ADD Earjack_check porting [End]
-//LGE_CHANGE_S[TestMode][jinhwan.do@lge.com] 2012-02-14, SD Card Patch from LS696 for TestMode [END]
-#ifdef CONFIG_BACKLIGHT_LM3530
-/* define gpio pin number of i2c-gpio */
-
-//LGE_S,Added for pcb revision check
-#ifdef CONFIG_LGE_HW_REVISION
-typedef enum {
-	HW_REV_UNKNOWN = 0,
-    HW_REV_EVB1,
-    HW_REV_EVB2,
-    HW_REV_A,
-    HW_REV_B,
-    HW_REV_C,
-    HW_REV_D,
-    HW_REV_E,
-    HW_REV_F,
-    HW_REV_G,
-    HW_REV_1_0,
-    HW_REV_1_1,
-    HW_REV_1_2,
-    HW_REV_MAX
-} hw_rev_enum_type;
-
+#if __GNUC__
+#define __WEAK __attribute__((weak))
 #endif
-//LGE_E,Added for pcb revision check
 
 /********************************************************************/
 // common data
@@ -84,6 +56,47 @@ struct gpio_i2c_pin {
 	unsigned int irq_pin;
 };
 
+
+/********************************************************************/
+// platform data
+/********************************************************************/
+/* gpio switch platform data */
+struct lge_gpio_switch_platform_data {
+	const char *name;
+	unsigned *gpios;
+	size_t num_gpios;
+	unsigned long irqflags;
+	unsigned int wakeup_flag;
+	int (*work_func)(void);
+	char *(*print_state)(int state);
+	int (*sysfs_store)(const char *buf, size_t size);
+};
+
+/* msm pmic leds platform data */
+struct msm_pmic_leds_pdata {
+	struct led_classdev *custom_leds;
+	int (*register_custom_leds)(struct platform_device *pdev);
+	void (*unregister_custom_leds)(void);
+	void (*suspend_custom_leds)(void);
+	void (*resume_custom_leds)(void);
+	int (*msm_keypad_led_set)(unsigned char value);
+};
+
+/* LED flash platform data */
+struct led_flash_platform_data {
+	int gpio_flen;
+	int gpio_en_set;
+	int gpio_inh;
+};
+
+/* android vibrator platform data */
+struct android_vibrator_platform_data {
+	int enable_status;
+	int (*power_set)(int enable); 		/* LDO Power Set Function */
+	int (*pwn_set)(int enable, int gain); 		/* PWM Set Function */
+	int (*ic_enable_set)(int enable); 	/* Motor IC Set Function */
+};
+
 /* backlight platform data */
 struct backlight_platform_data {
 	void (*platform_init)(void);
@@ -102,13 +115,6 @@ struct m3s_backlight_platform_data {
 	int init_on_boot;			 /* flag which initialize on system boot */
 	int version;				 /* Chip version number */
 };
-#endif
-//LGE_CHANGE_S CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com)
-/* LED flash platform data */
-struct led_flash_platform_data {
-	int gpio_en;
-};
-//LGE_CHANGE_E CAMERA FIRMWARE UPDATE (keonwoo01.park@lge.com)
 
 struct msm_panel_r61529_pdata {
 	int gpio;
@@ -153,6 +159,8 @@ struct touch_platform_data {
 	int scl;
 	int sda;
 };
+
+void __init lge_add_input_devices(void);
 #endif
 
 //LGE_CHANGE_S SENSOR FIRMWARE UPDATE (jongkwon.chae@lge.com)
@@ -254,6 +262,8 @@ void __init lge_add_input_devices(void);
 //LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
 void __init lge_add_camera_devices(void);
 //LGE_CHANGE_E CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
-
+#if defined (CONFIG_USB_G_LGE_ANDROID) && defined (CONFIG_LGE_PM)
+void __init lge_add_usb_devices(void);
+#endif
 #endif /*!__ASM_ARCH_MSM_BOARD_M3S_H*/
 

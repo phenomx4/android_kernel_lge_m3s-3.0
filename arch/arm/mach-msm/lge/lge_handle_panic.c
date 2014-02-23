@@ -26,7 +26,7 @@
 #include <asm/setup.h>
 #include <linux/io.h>
 
-#if defined (CONFIG_MACH_LGE) || defined (CONFIG_MACH_MSM7630_U0)
+#if defined (CONFIG_MACH_LGE_M3S)
 #include <mach/lge_mem_misc.h>
 #else
 #include <mach/board_lge.h>
@@ -34,10 +34,6 @@
 
 #define PANIC_HANDLER_NAME "panic-handler"
 #define PANIC_DUMP_CONSOLE 0
-
-#if !defined (CONFIG_VT_CONSOLE)
-struct vc vc_cons [PANIC_DUMP_CONSOLE+1];
-#endif
 
 /* following data structure is duplicate of drivers/staging/android/ram_console.c */
 struct ram_console_buffer {
@@ -201,7 +197,7 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 	int time_count;
 	unsigned long flags;
 	struct membank *bank = &meminfo.bank[0];
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	struct membank *bank1 = &meminfo.bank[1];
 #endif
 
@@ -231,7 +227,7 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 	if(ram_console_buffer == NULL)
 		return NOTIFY_BAD;
 
-	//printk("%s, ram_console sig : 0x%x, start : 0x%x, size : 0x%x\n", ram_console_buffer->sig,
+	//printk("%s, ram_console sig : 0x%x, start : 0x%x, size : 0x%x\n", ram_console_buffer->sig, \
 	//	ram_console_buffer->start, ram_console_buffer->size);
 
 	start = ram_console_buffer->start;
@@ -241,7 +237,7 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 	
 	//panic_dump_log = (struct panic_log_dump *)(data - sizeof(struct ram_console_buffer)
 	//				+ (SZ_1K * 128));
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	panic_dump_log = ioremap(bank1->start + bank1->size + (LGE_RAM_CONSOLE_SIZE/2), (LGE_RAM_CONSOLE_SIZE/2));
 #else
 	panic_dump_log = ioremap(bank->start + bank->size + (LGE_RAM_CONSOLE_SIZE/2), (LGE_RAM_CONSOLE_SIZE/2));
@@ -249,7 +245,7 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 	if(panic_dump_log == NULL)
 		return NOTIFY_BAD;
 
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	ram_misc_buffer = ioremap(bank1->start + bank1->size + LGE_RAM_CONSOLE_SIZE, LGE_RAM_CONSOLE_MISC_SIZE);
 #else
 	ram_misc_buffer = ioremap(bank->start + bank->size + LGE_RAM_CONSOLE_SIZE, LGE_RAM_CONSOLE_MISC_SIZE);
@@ -271,10 +267,10 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 
 		ram_misc_buffer->magic_key = PANIC_MAGIC_KEY;
 		
-		//printk("%s, panic_dump_log magic : 0x%x, size : 0x%x\n", panic_dump_log->magic_key,
+		//printk("%s, panic_dump_log magic : 0x%x, size : 0x%x\n", panic_dump_log->magic_key, \
 		//	panic_dump_log->size);
 
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 /*
 	meminfo = (
 	  nr_banks = 0x2,
@@ -287,7 +283,7 @@ static int display_panic_reason(struct notifier_block *this, unsigned long event
 		lge_set_reboot_reason(bank->size);
 #endif
 
-		if ((int)ptr == CRASH_ARM9) /* arm9 has crashed */
+		if (ptr == CRASH_ARM9) /* arm9 has crashed */
 			panic_dump_log->magic_key = CRASH_ARM9;
 
 		if (report_start < start) {

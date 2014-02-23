@@ -407,11 +407,6 @@ SIDE EFFECTS
  	//rsp_pkt->header.err_code = UDBU_ERROR_CANNOT_COMPLETE;
 	nPartionCount = lge_mmc_scan_partitions();
 	printk(KERN_ERR "diag_SRD_Init nPartionCount = %d", nPartionCount);
-	if(nPartionCount < 0)
-	{
-		printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-		goto Error;
-	}
 
 	if(!userDataBackUpBadCalc())
 	{

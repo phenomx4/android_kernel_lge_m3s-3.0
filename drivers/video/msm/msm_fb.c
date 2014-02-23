@@ -55,6 +55,10 @@
 /*  Idle wakelock to prevent PC between wake up and Vsync */
 struct wake_lock mdp_idle_wakelock;
 
+#if defined (CONFIG_LGE_LCD_K_CAL)
+extern int mdp_write_kcal_reg(const char* buf);
+#endif
+
 static unsigned char *fbram;
 static unsigned char *fbram_phys;
 static int fbram_size;
@@ -322,6 +326,19 @@ static void msm_fb_remove_sysfs(struct platform_device *pdev)
 	sysfs_remove_group(&mfd->fbi->dev->kobj, &msm_fb_attr_group);
 }
 
+#if defined (CONFIG_LGE_LCD_K_CAL)
+static ssize_t mdp_write_kcal(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	int result;
+	
+	result = mdp_write_kcal_reg(buf);
+	printk("#### mdp_write_kcal Out : the result=%d  count=%d ####\n",result, count);
+
+	return count;
+}
+static DEVICE_ATTR(mdp_kcal,0660,NULL,mdp_write_kcal);
+#endif
+
 static int msm_fb_probe(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -398,6 +415,13 @@ static int msm_fb_probe(struct platform_device *pdev)
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	msm_fb_create_sysfs(pdev);
+
+	
+#if defined (CONFIG_LGE_LCD_K_CAL)
+	err = device_create_file(&pdev->dev, &dev_attr_mdp_kcal);//LGE_UPDATE heebae.song@lge.com 
+	if(err != 0)
+		printk("%s: could not create kcal file\n",__func__ );	
+#endif
 	return 0;
 }
 

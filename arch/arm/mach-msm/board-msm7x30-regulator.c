@@ -121,14 +121,6 @@ PCOM_VREG_CONSUMERS(ldo00) = {
 };
 
 #ifdef CONFIG_MACH_MSM7630_U0
-PCOM_VREG_CONSUMERS(ldo01) = {
-	REGULATOR_SUPPLY("ldo01",	NULL),
-	REGULATOR_SUPPLY("ldo1",	NULL),
-	REGULATOR_SUPPLY("gp8",	NULL),
-};
-#endif
-
-#ifdef CONFIG_MACH_MSM7630_U0
 /*L2 -NC*/
 #else
 PCOM_VREG_CONSUMERS(ldo02) = {
@@ -309,14 +301,12 @@ static struct proccomm_regulator_info msm7x30_pcom_vreg_info[] = {
 	 * V = automatic voltage set (meaningful for single-voltage regs only)
 	 * S = supply voltage (uV)
 	 *             name  id  supp    min uV    max uV  R   P  A  B  V  S */
-#ifdef CONFIG_MACH_MSM7630_U0
 	PCOM_VREG_SMP(smps0,  3, NULL,	 375000,  3050000, 0, -1, 0, 0, 0, 0),
 	PCOM_VREG_SMP(smps1,  4, NULL,	 375000,  3050000, 0, -1, 0, 0, 0, 0),
 	PCOM_VREG_SMP(smps2, 28, NULL,	 375000,  3050000, 0, -1, 0, 0, 0, 0),
 	PCOM_VREG_SMP(smps3, 29, NULL,	 375000,  3050000, 0, -1, 0, 0, 0, 0),
 	PCOM_VREG_SMP(smps4, 43, NULL,	 375000,  3050000, 0, -1, 0, 0, 0, 0),
 	PCOM_VREG_LDO(ldo00,  5, NULL,	 750000,  1525000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo01, 33, NULL,	 750000,  1525000, 0, -1, 0, 0, 0, 0), /*L1 - 1V2_MSM_PAD*/
 	/*L2 -NC*/
 	PCOM_VREG_LDO(ldo03, 19, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L3 - 2V85_RFSW*/
 	/*L4 - NC*/
@@ -327,11 +317,7 @@ static struct proccomm_regulator_info msm7x30_pcom_vreg_info[] = {
 	PCOM_VREG_LDO(ldo09,  8, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L9 - 2V05_MSM_ANALOG*/
 	PCOM_VREG_LDO(ldo10,  7, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L10 - 2V85_MICRO_SD*/
 	PCOM_VREG_LDO(ldo11, 21, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L11 - 1V8_CAM_IO*/
-#if defined (CONFIG_MACH_MSM7630_U0)
-	PCOM_VREG_LDO(ldo12, 34, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L12 - 3V0_TOUCH*/
-#elif defined (CONFIG_MACH_LGE_M3S)
 	PCOM_VREG_LDO(touch3v0, 34, NULL,  1500000,  3050000, 0, -1, 0, 0, 0, 0),
-#endif
 	PCOM_VREG_LDO(ldo13, 15, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L13 - 3V0_WCN_PWR*/
 	PCOM_VREG_LDO(ldo14, 24, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L14 - 2V8_LCD*/
 	PCOM_VREG_LDO(ldo15, 23, NULL,	1500000,  3050000, 0, -1, 0, 0, 0, 0), /*L15 - 2V8_CAM_AF*/
@@ -348,50 +334,8 @@ static struct proccomm_regulator_info msm7x30_pcom_vreg_info[] = {
 	/*L23 - NC*/
 	PCOM_VREG_LDO(ldo24, 41, NULL,	 750000,  1525000, 0, -1, 0, 0, 0, 0), /*L24 - 1V2_RF*/
 	PCOM_VREG_LDO(ldo25, 42, NULL,	 750000,  1525000, 0, -1, 0, 0, 0, 0), /*L25 - 1V2_POP_VDDQ*/
-#else
-	PCOM_VREG_SMP(smps0,  3, NULL,   500000,  1500000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_SMP(smps1,  4, NULL,   500000,  1500000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_SMP(smps2, 28, NULL,  1300000,  1300000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_SMP(smps3, 29, NULL,  1800000,  1800000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_SMP(smps4, 43, NULL,  2200000,  2200000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo00,  5, NULL,  1200000,  1200000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo02, 46, NULL,  2600000,  2600000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo03, 19, NULL,  1800000,  3000000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo04,  9, NULL,  2850000,  2850000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo05, 18, NULL,	2850000,  2850000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo06, 16, NULL,  3075000,  3400000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo07, 44, NULL,	1800000,  1800000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo08, 32, NULL,  1800000,  1800000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo09,  8, NULL,	2050000,  2050000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo10,  7, NULL,	2600000,  2600000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo11, 21, NULL,  2600000,  2600000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo12, 34, NULL,  1800000,  1800000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo13, 15, NULL,	2900000,  3050000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo14, 24, NULL,  2850000,  2850000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo15, 23, NULL,  3050000,  3100000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo16, 35, NULL,  2600000,  2600000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo17, 36, NULL,  2600000,  2600000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo18, 37, NULL,	2200000,  2200000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo19, 45, NULL,  2400000,  2500000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo20, 38, NULL,	1500000,  1800000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo21, 39, NULL,	1100000,  1100000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo22, 40, NULL,	1200000,  1300000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo23, 22, NULL,  1350000,  1350000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo24, 41, NULL,	1200000,  1200000, 0, -1, 0, 0, 0, 0),
-	PCOM_VREG_LDO(ldo25, 42, NULL,	1200000,  1200000, 0, -1, 0, 0, 0, 0),
-#endif
-
-	/* Low-voltage switches */
-#if defined (CONFIG_MACH_MSM7630_U0)
-	PCOM_VREG_LVS(lvsw0, 47, NULL,					   0, -1, 0, 0), /*LVS0 - 1V8_POP_VDD1*/
-	PCOM_VREG_LVS(lvsw1, 48, NULL,					   0, -1, 0, 0), /*LVS1 - 1V8_LCD_IO*/
-#elif defined (CONFIG_MACH_LGE_M3S)
 	PCOM_VREG_LVS(touch1v8, 47, NULL,                     0, -1, 0, 0),
 	PCOM_VREG_LVS(lvsw1, 48, NULL,					   0, -1, 0, 0),
-#else
-	PCOM_VREG_LVS(lvsw0, 47, NULL,					   0, -1, 0, 0),
-	PCOM_VREG_LVS(lvsw1, 48, NULL,					   0, -1, 0, 0),
-#endif
 
 	PCOM_VREG_NCP(ncp,   31, NULL, -1800000, -1800000, 0,     0, 0, 0, 0),
 };

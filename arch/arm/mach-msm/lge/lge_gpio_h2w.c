@@ -141,10 +141,8 @@ static void insert_headset(void)
 		hi->mic_bias_power(1);
 	}
 #ifdef CONFIG_LGE_AUDIO_HEADSET_PROTECT
-#if 0   //minyoung1.kim@lge.com À§Ä¡ º¯°æ 
-	gpio_set_value(hi->gpio_mic_bias_en, 1);  
+	gpio_set_value(hi->gpio_mic_bias_en, 1);
 	msleep(100);
-#endif
 #endif 	
 	jpole = gpio_get_value(hi->gpio_jpole);
 
@@ -298,11 +296,6 @@ static irqreturn_t detect_irq_handler(int irq, void *dev_id)
 	/*Attached*/	
 	if (switch_get_state(&hi->sdev) == BIT_NO_DEVICE) {
 		hrtimer_start(&hi->timer, hi->debounce_time, HRTIMER_MODE_REL); 
-		
-#ifdef CONFIG_LGE_AUDIO_HEADSET_PROTECT
-//minyoung1.kim@lge.com À§Ä¡ º¯°æ 
-			gpio_set_value(hi->gpio_mic_bias_en, 1);
-#endif 	
 	}
 	/*Detached*/		
 	else if(switch_get_state(&hi->sdev) == BIT_HEADSET
@@ -350,7 +343,7 @@ static int gpio_h2w_probe(struct platform_device *pdev)
 	hi->ignore_btn = 0;
 	hi->mic_bias_power = pdata->mic_bias_power;
 	hi->debounce_time = ktime_set(0, 500000000);   /* VS760 100 ms -> 300ms */
-	hi->btn_debounce_time = ktime_set(0, 10000000); /* 10 ms */  //minyoung1.kim@lge.com 100 -> 10ms
+	hi->btn_debounce_time = ktime_set(0, 100000000); /* 10 ms */
 	hi->unplug_debounce_time = ktime_set(0, 100000000); //add eklee 100 ms 
 
 	hi->gpio_detect = pdata->gpio_detect;    
@@ -359,8 +352,7 @@ static int gpio_h2w_probe(struct platform_device *pdev)
 #ifdef CONFIG_LGE_AUDIO_HEADSET_PROTECT		
 	hi->gpio_mic_bias_en = pdata->gpio_mic_bias_en;
 #endif
-	//hi->sdev.name = "h2w";
-	hi->sdev.name = "h2w_headset";    //minyoung1.kim@lge.com  - changed headset dev name: h2w -> h2w_headset 
+	hi->sdev.name = "h2w";
 	hi->sdev.print_name = gpio_h2w_print_name;
 
 	wake_lock_init(&hi->wake_lock, WAKE_LOCK_SUSPEND, "h2w_detect_lock");
@@ -458,8 +450,7 @@ static int gpio_h2w_probe(struct platform_device *pdev)
 		goto err_request_input_dev;
 	}
 
-	//hi->input->name = "h2w headset";   
-	hi->input->name = "h2w_headset";   //minyoung1.kim@lge.com  - changed headset dev name: h2w -> h2w_headset 
+	hi->input->name = "h2w headset";
 	hi->input->evbit[0] = BIT_MASK(EV_KEY);
 	hi->input->keybit[BIT_WORD(KEY_MEDIA)] = BIT_MASK(KEY_MEDIA);
 

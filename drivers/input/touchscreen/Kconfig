@@ -287,7 +287,7 @@ config TOUCHSCREEN_MCS5000
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called mcs5000_ts.
-
+	  
 config TOUCHSCREEN_MCS8000
 	tristate "MELFAS MCS-8000 (MMS-128) touchscreen"
 	depends on I2C
@@ -311,7 +311,7 @@ config TOUCHSCREEN_MELFAS_TS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called mcs5000_ts.
-	  
+
 config TOUCHSCREEN_MTOUCH
 	tristate "MicroTouch serial touchscreens"
 	select SERIO

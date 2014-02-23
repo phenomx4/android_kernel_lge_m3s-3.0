@@ -20,6 +20,18 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/wakelock.h>
+// LGE_CHANGE_S [2011.02.07] [myeonggyu.son@lge.com] [gelato] key matrix drv line sensing delay [START]
+#ifdef CONFIG_MACH_MSM7X27_GELATO
+#include <linux/delay.h>
+#endif
+// LGE_CHANGE_E [2011.02.07] [myeonggyu.son@lge.com] [gelato] key matrix drv line sensing delay [END]
+
+// LGE_CHANGE_S [myeonggyu.son@lge.com] [2011.02.25] [GELATO] enable or disable key logging status of slate [START]
+
+extern int key_touch_logging_status;
+extern void mtc_send_key_log_packet(unsigned long keycode, unsigned long state);
+
+// LGE_CHANGE_E [myeonggyu.son@lge.com] [2011.02.25] [GELATO] enable or disable key logging status of slate [END]
 
 struct gpio_kp {
 	struct gpio_event_input_devs *input_devs;
@@ -126,9 +138,24 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
 			input_report_key(kp->input_devs->dev[dev], keycode, pressed);
+
+			// LGE_CHANGE_S [2011.0125] [myeonggyu.son@lge.com] [gelato] keypad log [START]
+			printk("gpiomatrix: key %x, %d-%d (%d-%d) "
+					"changed to %d\n", keycode,
+					out, in, mi->output_gpios[out],
+					mi->input_gpios[in], pressed);
+			// LGE_CHANGE_E [2011.0125] [myeonggyu.son@lge.com] [gelato] keypad log [END]			
+// LGE_CHANGE_S [myeonggyu.son@lge.com] [2011.02.25] [GELATO] enable or disable key logging status of slate [START]
+#ifdef CONFIG_LGE_DIAG
+			if(key_touch_logging_status == 1 && pressed == 1)
+				mtc_send_key_log_packet((unsigned long)keycode, 1L);
+#endif
+// LGE_CHANGE_E [myeonggyu.son@lge.com] [2011.02.25] [GELATO] enable or disable key logging status of slate [END]
 		}
 	}
 }
+
+extern int lgf_key_lock;
 
 static void report_sync(struct gpio_kp *kp)
 {
@@ -137,12 +164,6 @@ static void report_sync(struct gpio_kp *kp)
 	for (i = 0; i < kp->input_devs->count; i++)
 		input_sync(kp->input_devs->dev[i]);
 }
-
-//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [Start]	
-#ifdef CONFIG_LGE_DIAG_TESTMODE
-extern int lgf_key_lock;
-#endif
-//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [End]			
 
 static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 {
@@ -206,16 +227,10 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		key_index = 0;
 		for (out = 0; out < mi->noutputs; out++)
 			for (in = 0; in < mi->ninputs; in++, key_index++)
-//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [Start]	
-#ifdef CONFIG_LGE_DIAG_TESTMODE
 			{
 				if (!lgf_key_lock)
 					report_key(kp, key_index, out, in);
 			}
-#else
-				report_key(kp, key_index, out, in);
-#endif
-//LGE_CHANGE jinhwan.do 20120321 Test Key Lock Feature [End]			
 		report_sync(kp);
 	}
 	if (!kp->use_irq || kp->some_keys_pressed) {

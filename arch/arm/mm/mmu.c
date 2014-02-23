@@ -1211,12 +1211,27 @@ void __init paging_init(struct machine_desc *mdesc)
 
 	top_pmd = pmd_off_k(0xffff0000);
 
+/*
+ * change allocation function due to memory corruption
+ * allocation address of zero_page => phy : 0x2C2FC000, va : 0xEC0FC000
+ * reserved.cnt  = 0x3
+ * reserved[0x0]	 [0x00000000204000-0x00000001018c97], 0xe14c98 bytes
+ * reserved[0x1]	 [0x00000001900000-0x0000000192ce40], 0x2ce41 bytes
+ * reserved[0x2]	 [0x0000002c2f6000-0x0000002c2fffff], 0xa000 bytes <= bootmem_init()
+ */
 	/* allocate the zero page. */
 	zero_page = early_alloc(PAGE_SIZE);
 
 	bootmem_init();
 
 	empty_zero_page = virt_to_page(zero_page);
+/*
+ * CONFIG_LGE_BOARD_BRINGUP
+ * M3S 8X55 LIGHT VERSION : EBI1 is dedicated to 0x20000000
+ * if this is not set, __virt_to_phys() will return wrong values that are not accessible.
+ * page fault will be invoked while __flush_dcache_page() in paging_init()
+ * change EBI1_PHYS_OFFSET to 0x20000000 in kernel\arch\arm\mach-msm\include\mach\memory.h
+ */
 	__flush_dcache_page(NULL, empty_zero_page);
 
 #if defined(CONFIG_ARCH_MSM7X27)

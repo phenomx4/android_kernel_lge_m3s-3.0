@@ -2327,7 +2327,6 @@ config FB_PRE_INIT_FB
 
 config FB_MSM_MDDI_R61529_HVGA
 	bool "MDDI R61529 HVGA Panel"
-	depends on  MACH_LGE_M3S_LCD
 	select FB_MSM_MDDI
 	---help---
 	  Support for MDDI HITACHI HVGA(320x480) Panel.

@@ -44,12 +44,12 @@ char amp_cal_data[AMP_CAL_MAX] = {IN1GAIN_0DB, HPL_VOL_0DB,\
                                                                                     IN1GAIN_6DB, SPK_VOL_0DB};
 
 //speaker= line out, headset=hph lr 
-char amp_cal_lodata[AMP_CAL_MAX] = {IN1GAIN_0DB, HPL_VOL_M3DB,\
+char amp_cal_lodata[AMP_CAL_MAX] = {IN1GAIN_0DB, HPL_VOL_0DB,\
                                                                                     IN2GAIN_0DB, SPK_VOL_0DB,\
                                                                                     IN1GAIN_0DB, HPL_VOL_M10DB,\
                                                                                     IN1GAIN_0DB, HPL_VOL_M6DB,\
-                                                                                    IN1GAIN_12DB, HPL_VOL_M30DB, SPK_VOL_M6DB,\
-                                                                                    IN2GAIN_6DB, SPK_VOL_0DB};
+                                                                                    IN1GAIN_6DB, HPL_VOL_M21DB, SPK_VOL_0DB,\
+                                                                                    IN2GAIN_6DB, SPK_VOL_M1DB};
 
 
 char *pAmpCalData;
@@ -65,48 +65,6 @@ bool first_boot = 1;
 static uint32_t msm_snd_debug = 1;
 module_param_named(debug_mask, msm_snd_debug, uint, 0664);
 
-//[start] jy0127.jang@lge.com add left and right loopback
-static uint32_t headset_path = 0;
-static int read_headset_path(char *buf, struct kernel_param *kp)
-{
-        struct file *fp = NULL;
-        mm_segment_t old_fs;
-        int read_size;
-
-        old_fs=get_fs();
-        set_fs(get_ds());
-
-        headset_path = 0;
-
-        fp = filp_open("/sdcard/headset_path", O_RDWR | O_SYNC, 0);
-        if (IS_ERR(fp)) {
-                goto headset_fail;
-        }
-
-        fp->f_pos = 0;
-        read_size = fp->f_op->read(fp, buf, 2, &fp->f_pos);
-
-        if (read_size <= 0) {
-                goto headset_fail;
-        }
-
-        headset_path = buf[0] - '0';
-
-headset_fail:
-        if (!IS_ERR(fp))
-                filp_close(fp,NULL);
-
-        set_fs(old_fs);
-        return 1;
-}
-static int write_headset_path(const char *buf, struct kernel_param *kp)
-{
-        headset_path = buf[0] - '0';
-        return 1;
-}
-module_param_call(headset_path, write_headset_path, read_headset_path, NULL, 0664);
-//module_param_named(headset_path, headset_path, int, 0664);
-//[end] jy0127.jang@lge.com add left and right loopback
 
 struct amp_data {
 	struct i2c_client *client;
@@ -154,6 +112,7 @@ int WriteI2C(char reg, char val)
 void set_amp_PowerDown(void)
 {
 	int fail=0;
+
 #if 0
 	fail |= WriteI2C(SUBSYSTEM_CONTROL, (BYPASS | SWS));
 #else
@@ -235,36 +194,6 @@ EXPORT_SYMBOL(set_amp_earpiece_voice);
 void set_amp_headset_mono_voice(void)
 {
 	int fail=0;
-//[start] jy0127.jang@lge.com add left and right loopback	
-	if(headset_path==1)
-	{
-		fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-		fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_VOICE_INPUT] | IN1_SE));				//Modify for desired IN gain  //IN1_DIFF ->IN1_SE
-		fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN ));
-		fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB));
-		fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-		fail |= WriteI2C(HP_LEFT_VOLUME, (pAmpCalData[HEADSET_VOICE_OUTPUT]  | HPL_EN )); 		//Modify for desired HP gain
-		
-		fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);
-		printk(KERN_INFO "2 set_amp_headset_mono_voice_left() %d\n", fail);
-
-	}
-	else if(headset_path==2)
-	{
-		fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-		fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_VOICE_INPUT] | IN1_SE));				//Modify for desired IN gain  //IN1_DIFF ->IN1_SE
-		fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB ));
-		fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB | HPR_EN));
-		fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-		fail |= WriteI2C(HP_RIGHT_VOLUME, (pAmpCalData[HEADSET_VOICE_OUTPUT]  | HPR_EN )); 		//Modify for desired HP gain
-		
-		fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);
-		printk(KERN_INFO "2 set_amp_headset_mono_voice_right() %d\n", fail);
-
-	}
-	else
-//[end] jy0127.jang@lge.com add left and right loopback		
-	{
 	fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
 	fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_VOICE_INPUT] | IN1_SE)); 				//Modify for desired IN gain  //IN1_DIFF ->IN1_SE
 	fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN | HP_TRACK));
@@ -274,7 +203,6 @@ void set_amp_headset_mono_voice(void)
 
 	fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);
     printk(KERN_INFO "2 set_amp_headset_mono_voice() %d\n", fail);
-	}
 }
 EXPORT_SYMBOL(set_amp_headset_mono_voice);
 
@@ -329,52 +257,24 @@ void set_amp_headset_stereo_audio(void)
 
 	fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);
 #else
- #if 1     //minyoung1.kim@lge.com - testmode mp3_LR ÃßÈÄ »èÁ¦ÇØ¾ßÇÒ ÄÚµå
-   if(headset_path==1) {
-	   fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-	   fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_AUDIO_INPUT]  | IN1_SE));			   //Modify for desired IN gain 
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN));
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB));
-	   fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]	| HPL_EN ));		   //Modify for desired HP gain
-	   fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);  
-	   printk(KERN_INFO "5_1 set_amp_headset_stereo_audio() MP3 Left %d\n", fail);
-   	}
-   else if(headset_path==2) {
-   	   fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-	   fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_AUDIO_INPUT]  | IN1_SE));				//Modify for desired IN gain 
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB ));
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB | HPR_EN));
-	   fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]  | HPR_EN)); 		//Modify for desired HP gain
-	   fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);	
-	   printk(KERN_INFO "5_2 set_amp_headset_stereo_audio() MP3 Right %d\n", fail);
-   	}
-   else {
-	   fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-	   fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_AUDIO_INPUT]  | IN1_SE));			   //Modify for desired IN gain 
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN | HP_TRACK));
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB | HPR_EN));
-	   fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]	| HPL_EN | HP_TRACK));		   //Modify for desired HP gain
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]  | HPR_EN));	   //Modify for desired HP gain
-	   fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);  
-	   printk(KERN_INFO "5_3 set_amp_headset_stereo_audio() nomal %d\n", fail);
-   	}
- #else
-	   fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
-	   fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_AUDIO_INPUT]  | IN1_SE));			   //Modify for desired IN gain 
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN | HP_TRACK));
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB | HPR_EN));
-	   fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
-	   fail |= WriteI2C(HP_LEFT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]	| HPL_EN | HP_TRACK));		   //Modify for desired HP gain
-	   fail |= WriteI2C(HP_RIGHT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]  | HPR_EN));	   //Modify for desired HP gain
-	   fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);  
+	//fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_MUTE);
+	
+	fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
+	//	usleep(300*1000);	// 50ms
+	
+	fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[HEADSET_AUDIO_INPUT]  | IN1_SE));				//Modify for desired IN gain 
+	fail |= WriteI2C(HP_LEFT_VOLUME, (HPL_VOL_M60DB | HPL_EN | HP_TRACK));
+	fail |= WriteI2C(HP_RIGHT_VOLUME, (HPR_VOL_M60DB | HPR_EN));
 
-       printk(KERN_INFO "5 set_amp_headset_stereo_audio() %d\n", fail);
+	//fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
+		
+	fail |= WriteI2C(HEADPHONE_OUTPUT, HPOUT_IN1);
+	fail |= WriteI2C(HP_LEFT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]  | HPL_EN | HP_TRACK)); 		//Modify for desired HP gain
+	fail |= WriteI2C(HP_RIGHT_VOLUME, (pAmpCalData[HEADSET_AUDIO_OUTPUT]  | HPR_EN)); 		//Modify for desired HP gain
 
- #endif
+	fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);	
 #endif
+    printk(KERN_INFO "5 set_amp_headset_stereo_audio() %d\n", fail);
 }
 EXPORT_SYMBOL(set_amp_headset_stereo_audio);
 
@@ -424,15 +324,17 @@ EXPORT_SYMBOL(set_amp_headset_speaker_audio);
 void set_amp_speaker_stereo_audio(void)
 {
 	int fail=0;
-	fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
 	
+	//fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_MUTE);
+	
+	fail |= WriteI2C(SUBSYSTEM_CONTROL, (~SWS & ~BYPASS & ~SSM_EN));
+	//usleep(300*1000);	// 50ms
 	if(amp_pdata->line_out)
 	{
-#if 1
+#if 0
 		fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[SPEAKER_AUDIO_INPUT] | IN2_SE));							//Modify for desired IN gain 
 		fail |= WriteI2C(SPEAKER_VOLUME, (SPK_EN | pAmpCalData[SPEAKER_AUDIO_OUTPUT])); 						//Modify for desired SP gain
 		fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_IN2);
-//		fail |= WriteI2C(LIMITER_CONTROL, (ATTACK_2P56MS | RELEASE_287MS));   //0319 myoung_added
 #else
 	
 		fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[SPEAKER_AUDIO_INPUT] | IN2_DIFF));							//Modify for desired IN gain 
@@ -447,25 +349,19 @@ void set_amp_speaker_stereo_audio(void)
 		fail |= WriteI2C(INPUT_CONTROL, (pAmpCalData[SPEAKER_AUDIO_INPUT] | IN1_SE));							//Modify for desired IN gain 
 		fail |= WriteI2C(SPEAKER_VOLUME, (SPK_EN | pAmpCalData[SPEAKER_AUDIO_OUTPUT] ));							//Modify for desired SP gain
 		fail |= WriteI2C(SPEAKER_OUTPUT, SPKOUT_IN1);
-//		fail |= WriteI2C(LIMITER_CONTROL, (ATTACK_2P56MS | RELEASE_287MS));  //0319 myoung_added
-		
 	}
-
 	//amp_external_switch_off();
 	
-     printk(KERN_INFO "7 set_amp_speaker_stereo_audio() fail %d\n", fail);
+    printk(KERN_INFO "7 set_amp_speaker_stereo_audio() %d\n", fail);
 }
 EXPORT_SYMBOL(set_amp_speaker_stereo_audio);
 
 
 static ssize_t amp_gain_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-
 	if(amp_cal_pos > AMP_CAL_MAX)
 		amp_cal_pos = 0;
 
-
-	//return sprintf(buf, "%d\n", (int)pAmpCalData[amp_cal_pos]);
 	return sprintf(buf, "%d\n", (int)pAmpCalData[(int)amp_cal_pos]);
 }
 static ssize_t amp_gain_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
@@ -476,7 +372,6 @@ static ssize_t amp_gain_store(struct device *dev, struct device_attribute *attr,
 	if(amp_cal_pos > AMP_CAL_MAX)
 		return -EINVAL;
 	sscanf(buf, "%d", &gain);
-	//pAmpCalData[amp_cal_pos] =  (char)gain;
 	pAmpCalData[(int)amp_cal_pos] =  (char)gain;
 
 	return size;
@@ -562,9 +457,9 @@ static int flip_amp_ctl_probe(struct i2c_client *client, const struct i2c_device
 	i2c_set_clientdata(client, data);
 
 	if(amp_pdata->line_out)
-		pAmpCalData = (char *)&amp_cal_lodata;
+        pAmpCalData = &amp_cal_lodata[ 0 ];
 	else		
-		pAmpCalData = (char *)&amp_cal_data;
+		pAmpCalData = &amp_cal_data[ 0 ];
 		
 	if (msm_snd_debug & 1)
 		printk(KERN_INFO "%s chip found\n", client->name);

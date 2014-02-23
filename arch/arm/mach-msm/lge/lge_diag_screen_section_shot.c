@@ -25,10 +25,8 @@ extern PACK(void *) diagpkt_alloc (diagpkt_cmd_code_type code, unsigned int leng
 /*==========================================================================*/
 
 lcd_section_buf_info_type lcd_section_buf_info;
-//static unsigned char tmp_img_buf_32bit[MTC_SCRN_BUF_32BPP_SIZE];
-//static unsigned short tmp_img_buf_16bit[LCD_BUFFER_SIZE];
-extern unsigned char lge_img_capture_32bpp[MTC_SCRN_BUF_32BPP_SIZE];
-extern unsigned char lge_img_capture_16bpp[MTC_SCRN_BUF_SIZE_MAX];
+extern unsigned char tmp_img_block[MTC_SCRN_BUF_SIZE_MAX];
+unsigned short tmp_img_block_2[320*480*2];
 
 /*==========================================================================*/
 static void to_rgb565(byte* from, u16* to)
@@ -37,12 +35,12 @@ static void to_rgb565(byte* from, u16* to)
 	int r,g,b;
 	u16 h;
 
-	for(i=0; i<MTC_SCRN_BUF_32BPP_SIZE; i+=4){
-		r=((from[i]>>3)&0x1F);
-		g=((from[i+1]>>2)&0x3F);
-		b=((from[i+2]>>3)&0x1F);
+	for(i=0; i<320*480*4; i+=4){
+		r=from[i];
+		g=from[i+1];
+		b=from[i+2];
 		
-		h= ((((g&0x07)<<5)|b)&0x00FF) | (((((r<<3)&0xF8)|((g>>3)&0x07))<<8)&0xFF00);
+		h=(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3));
 
 		to[i/4]=h;
 	
@@ -63,7 +61,7 @@ static void read_framebuffer(byte* pBuf)
 		return;
   	}
 
-  phMscd_Filp->f_op->read(phMscd_Filp, pBuf, MTC_SCRN_BUF_32BPP_SIZE, &phMscd_Filp->f_pos);
+  phMscd_Filp->f_op->read(phMscd_Filp, pBuf, 320*480*4, &phMscd_Filp->f_pos);
   filp_close(phMscd_Filp,NULL);
 
   set_fs(old_fs);
@@ -76,12 +74,11 @@ PACK (void *)LGE_ScreenSectionShot (
 {
 	diag_screen_section_shot_type *req_ptr = (diag_screen_section_shot_type *)req_pkt_ptr;
   	diag_screen_section_shot_type *rsp_ptr = 0;
-  	int rsp_len;
+  	int rsp_len, packet_len;
 	int x_start=0, y_start=0, x_end=0, y_end=0, i, j;	
 	short *pImgBlock;	
 
 #if 0
-	int packet_len;
 	unsigned char tmp_buf[20];
 
 	memset(tmp_buf, 0x00, sizeof(tmp_buf));	
@@ -160,11 +157,11 @@ PACK (void *)LGE_ScreenSectionShot (
 							}					
 						}
 #else
-                  memset(lge_img_capture_32bpp, 0x00, sizeof(lge_img_capture_32bpp));
-                  memset(lge_img_capture_16bpp,0x00,sizeof(lge_img_capture_16bpp));
-                  read_framebuffer(lge_img_capture_32bpp);
+                  memset(tmp_img_block, 0x00, 320*480*4);
+                  memset(tmp_img_block_2,0x00,320*480*2);
+                  read_framebuffer(tmp_img_block);
 
-                  to_rgb565(lge_img_capture_32bpp,(u16 *)lge_img_capture_16bpp);
+                  to_rgb565(tmp_img_block,tmp_img_block_2);
 
                   pImgBlock = lcd_section_buf_info.buf;
 
@@ -174,7 +171,7 @@ PACK (void *)LGE_ScreenSectionShot (
                   	{							
                   		if(((i>=x_start) && (i<x_end)) && ((j>=y_start) && (j<y_end)))							
                   		{
-                  			*pImgBlock++ = lge_img_capture_16bpp[(j*LCD_MAIN_WIDTH)+i];
+                  			*pImgBlock++ = tmp_img_block_2[(j*320)+i];
                   		}
                   	}					
                   }

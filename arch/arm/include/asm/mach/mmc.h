@@ -59,7 +59,8 @@ struct msm_mmc_reg_data {
  */
 struct msm_mmc_slot_reg_data {
 	struct msm_mmc_reg_data *vdd_data; /* keeps VDD/VCC regulator info */
-	struct msm_mmc_reg_data *vdd_io_data; /* keeps VDD IO regulator info */
+	struct msm_mmc_reg_data *vccq_data; /* keeps VCCQ regulator info */
+	struct msm_mmc_reg_data *vddp_data; /* keeps VDD Pad regulator info */
 };
 
 struct msm_mmc_gpio {

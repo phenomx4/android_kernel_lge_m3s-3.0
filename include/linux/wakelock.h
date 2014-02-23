@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 
+
 /* A wake_lock prevents the system from entering suspend or other low power
  * states when active. If the type is set to WAKE_LOCK_SUSPEND, the wake_lock
  * prevents a full system suspend. If the type is WAKE_LOCK_IDLE, low power
@@ -73,10 +74,10 @@ int wake_lock_active(struct wake_lock *lock);
  */
 long has_wake_lock(int type);
 
-#ifdef CONFIG_LGE_SUSPEND_AUTOTEST
+#if 1
 int wake_lock_active_name(char *name);
 #endif
-#else /* else of CONFIG_HAS_WAKELOCK */
+#else
 
 static inline void wake_lock_init(struct wake_lock *lock, int type,
 					const char *name) {}
@@ -88,11 +89,11 @@ static inline void wake_unlock(struct wake_lock *lock) {}
 static inline int wake_lock_active(struct wake_lock *lock) { return 0; }
 static inline long has_wake_lock(int type) { return 0; }
 
-#endif /* endif of CONFIG_HAS_WAKELOCK */
+#endif
 
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
 enum lateresume_wq_stat_step {
-	LATERESUME_START = 1,
+	LATERESUME_QUEUED = 1,
+	LATERESUME_START,
 	LATERESUME_MUTEXLOCK,
 	LATERESUME_CHAINSTART,
 	LATERESUME_CHAINDONE,
@@ -100,7 +101,8 @@ enum lateresume_wq_stat_step {
 };
 
 enum earlysuspend_wq_stat_step {
-	EARLYSUSPEND_START = 1,
+	EARLYSUSPEND_QUEUED = 1,
+	EARLYSUSPEND_START,
 	EARLYSUSPEND_MUTEXLOCK,
 	EARLYSUSPEND_CHAINSTART,
 	EARLYSUSPEND_CHAINDONE,
@@ -146,6 +148,7 @@ static inline void save_earlysuspend_step(int step)
 static inline void save_suspend_step(int step)
 {
 	suspend_wq_stats.suspend_stat = step;
+	printk(KERN_INFO "[suspend] step = %d\n", step);
 }
 
 static inline void save_lateresume_call(char *name)
@@ -171,8 +174,5 @@ static inline void save_earlysuspend_call(char *name)
 			call_name,
 			sizeof(suspend_wq_stats.last_earlysuspend_call));
 }
-
-#endif /* CONFIG_LGE_DEBUGFS_SUSPEND */
-
-#endif /* endif of ifndef _LINUX_WAKELOCK_H*/
+#endif
 

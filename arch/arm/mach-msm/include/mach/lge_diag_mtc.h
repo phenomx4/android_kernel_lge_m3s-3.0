@@ -81,8 +81,6 @@ typedef enum
 #endif
 /********************** END PACK() Definition *****************************/
 
-#define MTC_MODULE "/system/bin/mtc"
-
 #define MTC_262K_CMASK_RED			0x0000FC00
 #define MTC_262K_CMASK_GREEN			0x000003F0
 #define MTC_262K_CMASK_BLUE 			0xC000000F
@@ -198,14 +196,11 @@ typedef union{
   mtc_req_type mtc_req;
 } PACKED DIAG_MTC_F_req_type;
 
-#define ETA_MTC_BMP_DATA "/data/eta.bmp"
-#define ETA_MTC_BMP_HEADER_CNT 54
 
-#define MTC_SCRN_BUF_SIZE_MAX (480*800*2 + ETA_MTC_BMP_HEADER_CNT) // mtc_pixel_16_type, 2bytes
+//#define MTC_SCRN_BUF_SIZE_MAX (320*480) // mtc_pixel_16_type, 2bytes
+#define MTC_SCRN_BUF_SIZE_MAX (320*480*4) // mtc_pixel_32_type, 4bytes
+
 #define MTC_SCRN_BUF_SIZE (1024*2)
-
-#define MTC_SCRN_BUF_32BPP_SIZE (480*800*4)
-#define MTC_SCRN_BUF_16BPP_SIZE (480*800*2)
 
 typedef enum
 {

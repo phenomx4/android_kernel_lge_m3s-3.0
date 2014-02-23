@@ -57,16 +57,6 @@ int rtc_hctosys(void)
 	rtc_tm_to_time(&tm, &tv.tv_sec);
 
 	do_settimeofday(&tv);
-	
-#if CONFIG_LGE_LOG_SERVICE
-	{
-		struct timespec ts;
-		getnstimeofday(&ts);
-		printk(KERN_UTC_BOOT "%d-%02d-%02d %02d:%02d:%02d.%06lu\n",
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-				tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000);
-	}
-#else
 
 	dev_info(rtc->dev.parent,
 		"setting system clock to "
@@ -74,7 +64,6 @@ int rtc_hctosys(void)
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 		tm.tm_hour, tm.tm_min, tm.tm_sec,
 		(unsigned int) tv.tv_sec);
-#endif
 
 err_invalid:
 err_read:

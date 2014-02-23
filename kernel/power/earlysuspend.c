@@ -46,7 +46,7 @@ enum {
 };
 static int state;
 
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 enum log_resume_step {
 	RESUME_KICK = 0,
 	RESUME_ENTRY,
@@ -89,7 +89,7 @@ void register_early_suspend(struct early_suspend *handler)
 			break;
 	}
 	list_add_tail(&handler->link, pos);
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 	handler->resume_avg = 0;
 	handler->resume_max = 0;
 	handler->resume_count = 0;
@@ -117,7 +117,7 @@ static void early_suspend(struct work_struct *work)
 	unsigned long irqflags;
 	int abort = 0;
 
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_earlysuspend_step(EARLYSUSPEND_START);
 	mutex_lock(&early_suspend_lock);
 	save_earlysuspend_step(EARLYSUSPEND_MUTEXLOCK);
@@ -140,12 +140,12 @@ static void early_suspend(struct work_struct *work)
 
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("early_suspend: call handlers\n");
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_earlysuspend_step(EARLYSUSPEND_CHAINSTART);
 #endif
 	list_for_each_entry(pos, &early_suspend_handlers, link) {
 		if (pos->suspend != NULL) {
-#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+#if 1
     		char sym[KSYM_SYMBOL_LEN];
 
 			sprint_symbol(sym, (unsigned long)pos->suspend);
@@ -157,13 +157,13 @@ static void early_suspend(struct work_struct *work)
 			pos->suspend(pos);
 #endif /* CONFIG_MACH_LGE */
 
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 			early_suspend_call_chain(pos);
 #endif /* CONFIG_LGE_EARLYSUSPEND_FUNC_TIME */
 		}
 	}
 
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_earlysuspend_call(NULL);
 	save_earlysuspend_step(EARLYSUSPEND_CHAINDONE);
 	mutex_unlock(&early_suspend_lock);
@@ -180,7 +180,7 @@ abort:
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
 		wake_unlock(&main_wake_lock);
 	spin_unlock_irqrestore(&state_lock, irqflags);
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_earlysuspend_step(EARLYSUSPEND_END);
 #endif
 }
@@ -191,10 +191,10 @@ static void late_resume(struct work_struct *work)
 	unsigned long irqflags;
 	int abort = 0;
 
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 	log_resume(RESUME_ENTRY);
 #endif
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_lateresume_step(LATERESUME_START);
 	mutex_lock(&early_suspend_lock);
 	save_lateresume_step(LATERESUME_MUTEXLOCK);
@@ -215,7 +215,7 @@ static void late_resume(struct work_struct *work)
 	}
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: call handlers\n");
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_lateresume_step(LATERESUME_CHAINSTART);
 #endif
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link) {
@@ -231,15 +231,15 @@ static void late_resume(struct work_struct *work)
 				pr_info("late_resume: calling %pf\n", pos->resume);
 			pos->resume(pos);
 #endif
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 			late_resume_call_chain(pos);
 #endif
 		}
 	}
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 	log_resume(RESUME_EXIT);
 #endif
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_lateresume_call(NULL);
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: done\n");
@@ -251,7 +251,7 @@ static void late_resume(struct work_struct *work)
 
 abort:
 	mutex_unlock(&early_suspend_lock);
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
+#if 1
 	save_lateresume_step(LATERESUME_END);
 #endif
 }
@@ -283,7 +283,7 @@ void request_suspend_state(suspend_state_t new_state)
 		state &= ~SUSPEND_REQUESTED;
 		wake_lock(&main_wake_lock);
 		queue_work(suspend_work_queue, &late_resume_work);
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
 		log_resume(RESUME_KICK);
 #endif
 	}
@@ -296,8 +296,8 @@ suspend_state_t get_suspend_state(void)
 	return requested_suspend_state;
 }
 
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
-#ifdef CONFIG_LGE_EARLYSUSPEND_FUNC_TIME
+#if 1
+#if 1
 static inline void log_resume(enum log_resume_step step)
 {
 	int msec;

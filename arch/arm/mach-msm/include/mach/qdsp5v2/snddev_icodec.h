@@ -38,7 +38,9 @@ struct snddev_icodec_data {
 	u32 property; /*variable used to hold the properties
 				internal to the device*/
 };
-//added_start minyoung1.kim@lge.com 
+
+//LGE_UPDATE_S	taeho.youn@lge.com
+
 #define DEVICE_ID_INTERNAL_HANDSET_VOICE_RX 0
 #define DEVICE_ID_INTERNAL_HEADSET_VOICE_RX   DEVICE_ID_INTERNAL_HANDSET_VOICE_RX+1
 #define DEVICE_ID_INTERNAL_SPEAKER_VOICE_RX   DEVICE_ID_INTERNAL_HEADSET_VOICE_RX+1
@@ -62,8 +64,12 @@ struct snddev_icodec_data {
 #define DEVICE_ID_EXTERNAL_BT_SCO_AUDIO_RX  DEVICE_ID_EXTERNAL_BT_SCO_VOICE_RX +1
 #define DEVICE_ID_EXTERNAL_BT_SCO_VOICE_TX  DEVICE_ID_EXTERNAL_BT_SCO_AUDIO_RX +1
 
+
 void set_ampcal_data(void);
 void set_QTRcal_data(void);
 //void set_voicecal_data(void);
-//added_end minyoung1.kim@lge.com 
+
+//LGE_UPDATE_E
+
+
 #endif

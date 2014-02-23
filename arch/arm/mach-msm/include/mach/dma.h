@@ -224,10 +224,20 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_SDC2_CHAN        8
 #define DMOV_SDC2_CRCI        7
 
+/* LGE_S,[US730],SD card insert->remove->reset issue */
+#ifdef CONFIG_MACH_LGE
+#define DMOV_SDC3_CHAN        10
+#else
 #define DMOV_SDC3_CHAN        8
+#endif
 #define DMOV_SDC3_CRCI        12
 
+#ifdef CONFIG_MACH_LGE
+#define DMOV_SDC4_CHAN        11
+#else
 #define DMOV_SDC4_CHAN        8
+#endif
+/* LGE_E,[US730],SD card insert->remove->reset issue */
 #define DMOV_SDC4_CRCI        13
 
 #define DMOV_TSIF_CHAN        10

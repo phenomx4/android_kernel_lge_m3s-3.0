@@ -117,6 +117,32 @@ int C_A_D = 1;
 struct pid *cad_pid;
 EXPORT_SYMBOL(cad_pid);
 
+
+// matthew.choi@lge.com LGE_GOTA update [START]
+typedef struct MmcPartition MmcPartition;
+
+struct MmcPartition {
+    char *device_index;
+    char *filesystem;
+    char *name;
+    unsigned dstatus;
+    unsigned dtype ;
+    unsigned dfirstsec;
+    unsigned dsize;
+};
+
+/* Recovery Message */
+struct recovery_message {
+	char command[32];
+	char status[32];
+	char recovery[1024];
+};
+
+extern int lge_mmc_scan_partitions(void);
+extern const MmcPartition *lge_mmc_find_partition_by_name(const char *name);
+extern int lge_write_block(unsigned int bytes_pos, unsigned char *buf, size_t size);
+// matthew.choi@lge.com LGE_GOTA update [END]
+
 /*
  * If set, this is used for preparing the system to power off.
  */
@@ -449,7 +475,29 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 			break;
 		}
 		buffer[sizeof(buffer) - 1] = '\0';
+// matthew.choi@lge.com LGE_GOTA update [START]
+		if (memcmp(buffer, "recovery", 8) == 0) {
+			struct recovery_message boot;
+			unsigned char buf[1088] = {0, };
+			const MmcPartition *pMisc_part = NULL; 
+			unsigned long misc_bytes_pos_in_emmc = 0;
 
+#ifdef CONFIG_LGE_EMMC_SUPPORT
+			lge_mmc_scan_partitions();
+			pMisc_part = lge_mmc_find_partition_by_name("misc");
+#endif
+			if ( pMisc_part == NULL ) break;
+			
+			misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512);
+			memset(&boot, 0x00, sizeof(struct recovery_message));
+			sprintf(boot.command, "boot-recovery");
+			sprintf(boot.recovery, "recovery\n--update_package=CACHE:\0\n");
+			memcpy(buf, &boot, sizeof(buf));
+#ifdef CONFIG_LGE_EMMC_SUPPORT
+			lge_write_block(misc_bytes_pos_in_emmc, buf, sizeof(boot));
+#endif
+		}
+// matthew.choi@lge.com LGE_GOTA update [END]
 		kernel_restart(buffer);
 		break;
 

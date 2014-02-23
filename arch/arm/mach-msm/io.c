@@ -310,9 +310,9 @@ static struct map_desc msm7x30_io_desc[] __initdata = {
 	MSM_DEVICE(SAW),
 	MSM_DEVICE(GCC),
 	MSM_DEVICE(TCSR),
-/* LGE_S, Add Peripheral web */
+#ifdef CONFIG_MACH_LGE_M3S
 	MSM_DEVICE(WEB),
-/* LGE_E, Add Peripheral web */
+#endif
 #if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
 	defined(CONFIG_DEBUG_MSM_UART3)
 	MSM_DEVICE(DEBUG_UART),

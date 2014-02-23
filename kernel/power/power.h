@@ -195,7 +195,7 @@ extern void suspend_test_finish(const char *label);
 #else
 static inline void suspend_test_start(void) {}
 static inline void suspend_test_finish(const char *label) {}
-#endif /* CONFIG_LGE_SUSPEND_AUTOTEST */
+#endif
 #endif /* !CONFIG_PM_TEST_SUSPEND */
 
 #ifdef CONFIG_PM_SLEEP

@@ -41,17 +41,18 @@
 #define ACDB_ID_HANDSET_MIC_ENDFIRE			0x2E
 #define ACDB_ID_I2S_TX					0x30
 //#if defined(CONFIG_LGE_AUDIO)
-//minyoung1.kim@lge.com  acdb id Ãß°¡ 
 #define ACDB_ID_HANDSET_VR_TX				0x41
 #define ACDB_ID_REC_CAMCORDER_TX			0x42
 #define ACDB_ID_VOICE_REC_TX				0x43
 #define ACDB_ID_HANDSET_LOOPBACK_TX		0x43
 #define ACDB_ID_HEADSET_LOOPBACK_TX			0x44
+
+
 //#endif
 #define ACDB_ID_HDMI					0x40
 #define ACDB_ID_FM_RX					0x4F
 /*Replace the max device ID,if any new device is added Specific to RTC only*/
-#define ACDB_ID_MAX                                 0x50
+#define ACDB_ID_MAX                                 ACDB_ID_FM_RX
 
 /* ID used for virtual devices */
 #define PSEUDO_ACDB_ID 					0xFFFF

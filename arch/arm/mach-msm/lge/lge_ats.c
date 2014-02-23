@@ -16,9 +16,9 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <mach/msm_rpcrouter.h>
-#include <linux/lge_at_cmd.h>
-//#include <mach/board-bryce.h>
-#include "lge_ats.h"
+#include <mach/lge_at.h>
+#include <mach/board_lge.h>
+#include <mach/lge_ats.h>
 
 /* Ats server definitions. */
 
@@ -42,7 +42,7 @@ struct ats_data lge_ats_data;
 
 static void lge_ats_update_atcmd_state(char *cmd, int state)
 {
-#if 1 // sehyuny.kim@lge.com defined (CONFIG_LGE_AT_CMD_DEVICE)
+#if defined (CONFIG_LGE_AT_CMD_DEVICE)
 	struct ats_data *data = &lge_ats_data;
 
 	if(!data->atdev)
@@ -60,12 +60,12 @@ static int handle_ats_rpc_call(struct msm_rpc_server *server,
 	switch (req->procedure)
 	{
 		case ONCRPC_LGE_ATCMD_ATS_ETA_PROC:
-			//printk(KERN_INFO"%s: ONCRPC_LGE_ATCMD_ATS_ETA_PROC\n", __func__);
+			printk(KERN_INFO"%s: ONCRPC_LGE_ATCMD_ATS_ETA_PROC\n", __func__);
 			if(data->handle_atcmd_eta)
 				return data->handle_atcmd_eta(server, req, len);
 			break;
 		case ONCRPC_LGE_ATCMD_ATS_PROC:
-			//printk(KERN_INFO"%s: ONCRPC_LGE_ATCMD_ATS_PROC\n", __func__);
+			printk(KERN_INFO"%s: ONCRPC_LGE_ATCMD_ATS_PROC\n", __func__);
 			if(data->handle_atcmd)
 				return data->handle_atcmd(server, req, len, data->update_atcmd_state);
 			break;
@@ -76,21 +76,23 @@ static int handle_ats_rpc_call(struct msm_rpc_server *server,
 	return 0;
 }
 
+#ifdef CONFIG_LGE_AT_CMD_DEVICE
 static struct atcmd_platform_data ats_atcmd_pdata = {
-	.name = "lge_atcmd",
+	.name = "alohag_atcmd",
 };
 
 static struct platform_device ats_atcmd_device = {
-	.name = "lge_atcmd",
+	.name = "alohag_atcmd",
 	.id = -1,
 	.dev    = {
 		.platform_data = &ats_atcmd_pdata
 	},
 }; 
+#endif
 
-#ifdef CONFIG_LGE_ATS_ETA
+#ifdef CONFIG_LGE_ATS_INPUT_DEVICE
 static struct platform_device ats_input_device = {
-	.name = "lge_ats_input",
+	.name = "ats_input",
 };
 #endif
 
@@ -113,9 +115,11 @@ static int __init lge_ats_init(void)
 	lge_ats_data.handle_atcmd_eta = lge_ats_handle_atcmd_eta;
 	lge_ats_data.update_atcmd_state = lge_ats_update_atcmd_state;
 
+#ifdef CONFIG_LGE_AT_CMD_DEVICE
 	platform_device_register(&ats_atcmd_device);
+#endif
 
-#ifdef CONFIG_LGE_ATS_ETA
+#ifdef CONFIG_LGE_ATS_INPUT_DEVICE
 	platform_device_register(&ats_input_device);
 #endif
 

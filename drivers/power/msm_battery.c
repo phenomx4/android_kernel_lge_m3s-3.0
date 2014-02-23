@@ -192,10 +192,10 @@ struct rpc_reply_batt_chg_v1 {
 	u32	battery_level;
 	u32     battery_voltage;
 	u32	battery_temp;
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 	u32 battery_soc;
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	u32	xo_temp;
 //wantaek.lim@lge.com 2012 07.20 Charging scenario If the device stop charging for heat, charging_status is discharging.
@@ -244,7 +244,7 @@ struct msm_battery_info {
 	u32 battery_level;
 	u32 battery_voltage; /* in millie volts */
 	u32 battery_temp;  /* in celsius */
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	u32 xo_temp;
 #endif
@@ -341,11 +341,11 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.04.03	
 	POWER_SUPPLY_PROP_TEMP,
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	POWER_SUPPLY_PROP_XO_TEMP,
 #endif
@@ -381,14 +381,14 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = msm_batt_info.batt_capacity;
 		break;
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.04.03	
 	case POWER_SUPPLY_PROP_TEMP:
 		val->intval = msm_batt_info.battery_temp;
 	  break;
 #endif
 
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	case POWER_SUPPLY_PROP_XO_TEMP:
 		val->intval = msm_batt_info.xo_temp;
@@ -481,14 +481,14 @@ static int msm_batt_get_batt_chg_status(void)
 		be32_to_cpu_self(v1p->battery_level);
 		be32_to_cpu_self(v1p->battery_voltage);
 		be32_to_cpu_self(v1p->battery_temp);
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 		be32_to_cpu_self(v1p->battery_soc);
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 		be32_to_cpu_self(v1p->xo_temp);
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012 07.20 Charging scenario If the device stop charging for heat, charging_status is discharging.
 			be32_to_cpu_self(v1p->is_charging);
 #endif
@@ -510,15 +510,15 @@ static void msm_batt_update_psy_status(void)
 	u32	battery_level;
 	u32     battery_voltage;
 	u32	battery_temp;
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 	u32 battery_soc;
 	u32 battery_capacity;
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	u32 xo_temp;
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012 07.20 Charging scenario If the device stop charging for heat, charging_status is discharging.
 	u32 is_charging;
 #endif
@@ -534,20 +534,20 @@ static void msm_batt_update_psy_status(void)
 	battery_level = rep_batt_chg.v1.battery_level;
 	battery_voltage = rep_batt_chg.v1.battery_voltage;
 	battery_temp = rep_batt_chg.v1.battery_temp;
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 	battery_soc = rep_batt_chg.v1.battery_soc;
 #endif
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.06.28	
 	xo_temp = rep_batt_chg.v1.xo_temp;
 #endif
 
-#ifdef CONFIG_MACH_LGE_CHARGING	 
+#if 1	 
 //wantaek.lim@lge.com 2012.04.03	
 	battery_temp = battery_temp * 10 ;
 #endif
 
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012 07.20 Charging scenario If the device stop charging for heat, charging_status is discharging.
 	is_charging =  rep_batt_chg.v1.is_charging;
 #endif
@@ -592,7 +592,7 @@ static void msm_batt_update_psy_status(void)
 	    battery_status == msm_batt_info.battery_status &&
 	    battery_level == msm_batt_info.battery_level &&
 	    battery_voltage == msm_batt_info.battery_voltage &&
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 	    battery_soc == msm_batt_info.batt_capacity &&
 #endif
 	    battery_temp == msm_batt_info.battery_temp) {
@@ -608,7 +608,7 @@ static void msm_batt_update_psy_status(void)
 
 	unnecessary_event_count = 0;
 
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 	DBG_LIMIT("BATT: rcvd: %d, %d, %d, %d; %d, %d, %d\n",
 		 charger_status, charger_type, battery_status,
 		 battery_level, battery_voltage, battery_temp, battery_soc);
@@ -647,7 +647,7 @@ static void msm_batt_update_psy_status(void)
 			supp = &msm_psy_batt;
 
 //wantaek.lim@lge.com 2012.06.05 Charging status is Discharging Without TA/USB
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 			DBG_LIMIT("Without CHG: Discharging.\n");
 			msm_batt_info.batt_status =
 				POWER_SUPPLY_STATUS_DISCHARGING;
@@ -726,7 +726,7 @@ static void msm_batt_update_psy_status(void)
 			    POWER_SUPPLY_STATUS_UNKNOWN;
 		} else {
 //wantaek.lim@lge.com 2012.06.05 Charging status is Discharging Without TA/USB
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 			DBG_LIMIT("BATT: Discharging.\n");
 			msm_batt_info.batt_status =
 				POWER_SUPPLY_STATUS_DISCHARGING;
@@ -892,20 +892,20 @@ static void msm_batt_update_psy_status(void)
 	msm_batt_info.battery_temp 	= battery_temp;
 
 
-#ifdef CONFIG_MACH_LGE_FUEL_GAUGE
+#if 1
 //	battery_capacity = msm_batt_info.calculate_capacity(battery_soc);
 	battery_capacity = battery_soc;
 
 
 	if (msm_batt_info.battery_voltage != battery_voltage
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.07.18 Thermal Mitigation 	
 		|| msm_batt_info.xo_temp	!= xo_temp
 #endif
 		|| msm_batt_info.batt_capacity != battery_capacity) {
 		msm_batt_info.battery_voltage = battery_voltage;
 		msm_batt_info.batt_capacity = battery_capacity;
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1	
 //wantaek.lim@lge.com 2012.07.18 Thermal Mitigation 	
 		msm_batt_info.xo_temp = xo_temp;
 #endif

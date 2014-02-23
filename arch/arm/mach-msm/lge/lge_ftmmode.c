@@ -2,17 +2,6 @@
 // lg_ftmmode.c
 //
 
-//LGE_CHANGE_S[jinhwan.do@lge.com] 2012-02-16 compile error is fixed [Start]
-#include <linux/device.h>
-#include <linux/platform_device.h>
-#include <asm/uaccess.h>
-#include <linux/syscalls.h>
-#include <linux/fcntl.h>
-#include <linux/limits.h>
-#include <mach/lge_mem_misc.h>
-#include <asm/setup.h> // for meminfo
-#include <linux/io.h>
-//LGE_CHANGE_S[jinhwan.do@lge.com] 2012-02-16 compile error is fixed [END]
 #include <linux/kernel.h>
 #include "../proc_comm.h"
 
@@ -32,11 +21,11 @@ void remote_set_ftm_boot(uint32 info)
 }
 EXPORT_SYMBOL(remote_set_ftm_boot);
 
-void remote_get_ftm_boot(uint32 info)
+void remote_get_ftm_boot(uint32 *info)
 {
-  unsigned ftmboot = info; //LGE_CHANGE_S[jinhwan.do@lge.com] 2012-02-16 compile error is fixed
-  msm_proc_comm(PCOM_OEM_GET_FTM_MODE_CMD, &ftmboot, NULL); //LGE_CHANGE_S[jinhwan.do@lge.com] 2012-02-16 compile error is fixed		
-  printk("##MSM_PROC_COMM, REMOTE_GET_FTM_BOOT[%d]##\n", ftmboot); 
+  unsigned *ftmboot = info;
+  msm_proc_comm(PCOM_OEM_GET_FTM_MODE_CMD, ftmboot, NULL);		
+  printk("##MSM_PROC_COMM, REMOTE_GET_FTM_BOOT[%d]##\n", *ftmboot); 
 }
 EXPORT_SYMBOL(remote_get_ftm_boot);
 

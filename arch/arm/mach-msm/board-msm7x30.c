@@ -107,31 +107,24 @@
 #include <linux/proc_fs.h>
 #endif /*CONFIG_LGE_RAM_CONSOLE || CONFIG_LGE_ERS*/
 
-#ifdef CONFIG_LGE_BOARD_BRINGUP
-#include <mach/board_lge.h>
-#endif
 
-#ifdef CONFIG_MACH_MSM7630_U0_CDMA
-#define MSM_PMEM_SF_SIZE	0x2100000
-#else
+#include <mach/board_lge.h>
+
+
 #define MSM_PMEM_SF_SIZE	0x1700000
-#endif
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_SIZE            0x780000
 #else
 #define MSM_FB_SIZE            0x500000
 #endif
-// LGE_CHANGE_S : 2012.07.26 sungmin.cho@lge.com increase pmem for 720p preview. 0x1E00000 -> 0x2100000
-//#define MSM_PMEM_ADSP_SIZE      0x1E00000
-#define MSM_PMEM_ADSP_SIZE      0x2100000
-// LGE_CHANGE_E : 2012.07.26 sungmin.cho@lge.com increase pmem for 720p preview. 0x1E00000 -> 0x2100000
+#define MSM_PMEM_ADSP_SIZE      0x1E00000
 #define MSM_FLUID_PMEM_ADSP_SIZE	0x2800000
 #define PMEM_KERNEL_EBI0_SIZE   0x600000
 #define MSM_PMEM_AUDIO_SIZE     0x200000
 
 #define PMIC_GPIO_INT		27
 #define PMIC_VREG_WLAN_LEVEL	2900
-#ifdef CONFIG_LGE_MMC_BRINGUP
+#ifdef CONFIG_MACH_LGE_M3S
 #define PMIC_GPIO_SD_DET	42
 #else
 #define PMIC_GPIO_SD_DET	36
@@ -178,7 +171,7 @@ static unsigned int phys_add = DDR2_BANK_BASE;
 unsigned long ebi1_phys_offset = DDR2_BANK_BASE;
 EXPORT_SYMBOL(ebi1_phys_offset);
 
-#ifdef CONFIG_LGE_UART_MODE
+#ifdef CONFIG_MACH_LGE_M3S
 extern int __init lge_get_uart_mode(void);
 static void __init lge_uart_device_init(void);
 #endif
@@ -499,7 +492,7 @@ static int pm8058_gpios_init(void)
 	};
 
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
-#ifdef CONFIG_LGE_MMC_BRINGUP
+#ifdef CONFIG_MACH_LGE_M3S
 	gpio_tlmm_config(GPIO_CFG(PMIC_GPIO_SD_DET, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	printk("%s: gpio_get_value(PMIC_GPIO_SD_DET) returns %d\n", __func__, gpio_get_value(PMIC_GPIO_SD_DET));
 #else
@@ -858,7 +851,7 @@ static int pm8058_pwm_enable(struct pwm_device *pwm, int ch, int on)
 	return rc;
 }
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static const unsigned int fluid_keymap[] = {
@@ -1029,7 +1022,7 @@ static struct pm8058_pwm_pdata pm8058_pwm_data = {
 	.enable         = pm8058_pwm_enable,
 };
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct pmic8058_led pmic8058_ffa_leds[] = {
@@ -1666,7 +1659,7 @@ static struct platform_device msm_gemini_device = {
 };
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 #ifdef CONFIG_MSM_VPE
@@ -1970,7 +1963,7 @@ static int __init buses_init(void)
 		pr_err("%s: gpio_tlmm_config (gpio=%d) failed\n",
 		       __func__, PMIC_GPIO_INT);
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	if (machine_is_msm8x60_fluid())
@@ -2986,7 +2979,7 @@ static struct platform_device msm_device_adspdec = {
 	},
 };
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct resource smc91x_resources[] = {
@@ -3477,7 +3470,7 @@ static struct msm_pm_boot_platform_data msm_pm_boot_pdata __initdata = {
 	.v_addr = (uint32_t *)PAGE_OFFSET,
 };
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct resource qsd_spi_resources[] = {
@@ -3817,7 +3810,7 @@ static struct platform_device android_pmem_device = {
 	.dev = { .platform_data = &android_pmem_pdata },
 };
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 #ifndef CONFIG_SPI_QSD
@@ -3870,7 +3863,7 @@ static struct msm_gpio dtv_panel_irq_gpios[] = {
 		"hdmi_int" },
 };
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct msm_gpio dtv_panel_gpios[] = {
@@ -4174,7 +4167,7 @@ static bool hdmi_check_hdcp_hw_support(void)
 		return true;
 }
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static int dtv_panel_power(int on)
@@ -4440,7 +4433,7 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static int mddi_toshiba_pmic_bl(int level)
@@ -4468,7 +4461,7 @@ static struct platform_device mddi_toshiba_device = {
 };
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static unsigned wega_reset_gpio =
@@ -5029,7 +5022,7 @@ bail:
 	return rc;
 }
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static int atv_dac_power(int on)
@@ -5072,7 +5065,7 @@ static struct tvenc_platform_data atv_pdata = {
 };
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static void __init msm_fb_add_devices(void)
@@ -5088,7 +5081,7 @@ static void __init msm_fb_add_devices(void)
 }
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct msm_panel_common_pdata lcdc_toshiba_panel_data = {
@@ -5118,7 +5111,7 @@ enum {
 	BT_TX,
 };
 
-#ifdef CONFIG_LGE_BT_DEVICE
+#ifdef CONFIG_MACH_LGE_M3S
 static struct msm_gpio bt_config_power_on[] = {
 	{ GPIO_CFG(135, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_RFR" },
@@ -5714,14 +5707,14 @@ static struct platform_device lg_diag_cmd_device = {
 	},
 };
 
-static struct platform_device us730_testmode_device = {
+static struct platform_device m3s_testmode_device = {
 	.name   = "testmode",
 };
 //LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
 
 static struct platform_device *devices[] __initdata = {
 #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
-#ifdef CONFIG_LGE_UART_MODE
+#ifdef CONFIG_MACH_LGE_M3S
 	// move uart device to be controlled by kernel command line
 #else
 	&msm_device_uart2,
@@ -5740,7 +5733,7 @@ static struct platform_device *devices[] __initdata = {
 #endif
 	&msm_device_smd,
 	&msm_device_dmov,
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	&smc91x_device,
@@ -5756,7 +5749,7 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_USB_G_ANDROID
 	&android_usb_device,
 #endif
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	&qsd_device_spi,
@@ -5771,7 +5764,7 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_device,
 	&msm_fb_device,
 	&msm_migrate_pages_device,
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	&mddi_toshiba_device,
@@ -5780,7 +5773,7 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	&lcdc_sharp_panel_device,
@@ -5833,7 +5826,7 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
 #endif
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 #ifdef CONFIG_MSM_VPE
@@ -5873,7 +5866,7 @@ static struct platform_device *devices[] __initdata = {
 	,&lg_diag_cmd_device
 /* hyoill.leem diagcmd device register */
 // matthew.cho@lge.com 111025 for testmode device files (ex. hw_version ..)
-	,&us730_testmode_device
+	,&m3s_testmode_device
 //LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-09, add device command for Test Mode.
 };
 
@@ -6021,7 +6014,7 @@ static void __init msm7x30_init_irq(void)
 	msm_init_irq();
 }
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
@@ -6621,7 +6614,7 @@ out:
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
-#ifdef CONFIG_LGE_MMC_BRINGUP
+#ifdef CONFIG_MACH_LGE_M3S
 	printk("%s(PMIC_GPIO_SD_DET) returns %d\n",__func__, gpio_get_value(PMIC_GPIO_SD_DET));
 	return (unsigned int) gpio_get_value(PMIC_GPIO_SD_DET)?0:1;
 #else
@@ -6635,15 +6628,15 @@ static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 static int msm_sdcc_get_wpswitch(struct device *dv)
 {
 // WP is not used, comment out
-#ifdef CONFIG_LGE_MMC_BRINGUP
+#ifdef CONFIG_MACH_LGE_M3S1
 	return -1;
 #else
 	void __iomem *wp_addr = 0;
 	uint32_t ret = 0;
 	struct platform_device *pdev;
 //LGE_CHANGE_S
-//	if (!(machine_is_msm7x30_surf()))
-//		return -1;
+	if (!(machine_is_msm7x30_surf()))
+		return -1;
 //LGE_CHANGE_S   
 	pdev = container_of(dv, struct platform_device, dev);
 
@@ -6727,7 +6720,7 @@ static struct mmc_platform_data msm7x30_sdc4_data = {
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7x30_sdcc_slot_status,
-#ifdef CONFIG_LGE_MMC_BRINGUP
+#ifdef CONFIG_MACH_LGE_M3S
 	.status_irq  = MSM_GPIO_TO_INT(PMIC_GPIO_SD_DET),
 #else
 	.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET - 1),
@@ -6872,8 +6865,8 @@ out2:
 out3:
 #endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-#ifdef CONFIG_LGE_MMC_BRINGUP
-	if (mmc_regulator_init(4, "ldo10", 2850000))
+#ifdef CONFIG_MACH_LGE_M3S
+	if (mmc_regulator_init(4, "gp4", 2850000))
 		return;
 #else
 	if (mmc_regulator_init(4, "mmc", 2850000))
@@ -6887,7 +6880,7 @@ out3:
 
 }
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static void __init msm7x30_init_nand(void)
@@ -6952,7 +6945,7 @@ static struct msm_tsif_platform_data tsif_platform_data = {
 #endif /* defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE) */
 /* TSIF end   */
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 #else
 static void __init pmic8058_leds_init(void)
 {
@@ -7238,7 +7231,7 @@ static struct i2c_board_info msm_isa1200_board_info[] = {
 
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 static int kp_flip_mpp_config(void)
@@ -7406,7 +7399,7 @@ static void __init msm7x30_init(void)
 
 	msm_clock_init(&msm7x30_clock_init_data);
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
-#ifdef CONFIG_LGE_UART_MODE
+#ifdef CONFIG_MACH_LGE_M3S
 	if(lge_get_uart_mode())
 		msm7x30_init_uart2();
 #else
@@ -7446,20 +7439,20 @@ static void __init msm7x30_init(void)
 		msm_adc_pdata.num_adc = ARRAY_SIZE(msm_adc_surf_device_names);
 	}
 
-#ifdef CONFIG_LGE_RAM_CONSOLE
+#ifdef CONFIG_MACH_LGE_M3S
 	lge_add_ramconsole_devices();
 #endif
 
-#ifdef CONFIG_LGE_ERS
+#ifdef CONFIG_MACH_LGE_M3S
 	lge_add_ers_devices();
 	lge_add_panic_handler_devices();
 #endif
 /* LGE_CHANGE_S [START] 2012.2.22 jaeho.cho@lge.com add lg usb platform device */
-#if defined (CONFIG_USB_G_LGE_ANDROID) && defined (CONFIG_LGE_PM)
+#ifdef CONFIG_MACH_LGE_M3S
 	lge_add_usb_devices();
 #endif
 /* LGE_CHANGE_S [END] 2012.2.22 jaeho.cho@lge.com add lg usb platform device */
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	pmic8058_leds_init();
@@ -7475,7 +7468,7 @@ static void __init msm7x30_init(void)
 	platform_add_devices(msm_footswitch_devices,
 			     msm_num_footswitch_devices);
 
-#ifdef CONFIG_LGE_UART_MODE
+#ifdef CONFIG_MACH_LGE_M3S
 	lge_uart_device_init();
 #endif
 
@@ -7484,8 +7477,10 @@ static void __init msm7x30_init(void)
 #ifdef CONFIG_USB_EHCI_MSM_72K
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
+	
 	msm7x30_init_mmc();
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+	
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	msm7x30_init_nand();
@@ -7510,7 +7505,7 @@ static void __init msm7x30_init(void)
 /*	sensors_ldo_init();*/
 
 	hdmi_init_regs();
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 // remove unnecessary drivers
 #else
 	msm_fb_add_devices();
@@ -7578,7 +7573,7 @@ static void __init msm7x30_init(void)
 				ARRAY_SIZE(tsc_i2c_board_info));
 #endif
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
+#ifdef CONFIG_MACH_LGE_M3S
 	// remove unnecessary drivers
 #else
 	if (machine_is_msm7x30_surf())
@@ -7606,14 +7601,14 @@ static void __init msm7x30_init(void)
 				__func__, usb_hub_gpio_cfg_value, rc);
 	}
 
-#if defined (CONFIG_MACH_LGE)
+#if defined (CONFIG_MACH_LGE_M3S)
     lge_add_lcd_devices();
 #endif
-#if defined(CONFIG_LGE_AUDIO)
+#if defined(CONFIG_MACH_LGE_M3S)
 	 lge_m3s_audio_init();
 #endif
 
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_MACH_LGE_M3S
     lge_add_input_devices();
 
 //LGE_CHANGE_S CAMERA FIRMWARE UPDATE (jongkwon.chae@lge.com)
@@ -7795,7 +7790,7 @@ static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
  * 0X20000000 might be used as EBI0_CS1.
  * With MSM7X30 Light, EBI1_CS0 will be fixed on 0X20000000.
  */
-#if defined(CONFIG_MACH_LGE)
+#if 0
     ebi1_phys_offset = DDR2_BANK_BASE;
     phys_add = DDR2_BANK_BASE;
 #else
@@ -7810,7 +7805,7 @@ static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
 #endif
 }
 
-#ifdef CONFIG_LGE_UART_MODE
+#ifdef CONFIG_MACH_LGE_M3S
 // move uart device to be controlled by kernel command line
 static struct platform_device *uart_devices[] __initdata = {
 	&msm_device_uart2,
@@ -7837,8 +7832,8 @@ MACHINE_START(MSM7X30_M3S, "LGE MSM7X30 M3S")
 MACHINE_END
 // LGE_CHANGE_E
 
-#ifdef CONFIG_LGE_REMOVE_UNNECESSARINESS
-// remove unnecessary drivers
+#ifdef CONFIG_MACH_LGE_M3S
+//
 #else
 MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
 	.boot_params = PLAT_PHYS_OFFSET + 0x100,

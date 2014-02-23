@@ -1773,13 +1773,12 @@ void msm_pm_flush_console(void)
 		printk(KERN_EMERG "msm_restart: Console was locked!\n");
 	console_unlock();
 }
-#endif
+#endif /*CONFIG_LGE_ERS*/
 
 // clean the ram console when normal shutdown
 #if defined(CONFIG_LGE_RAM_CONSOLE_CLEAN)
 extern void ram_console_clean_buffer(void);
-#endif
-
+#endif /*CONFIG_LGE_RAM_CONSOLE_CLEAN*/
 
 static void msm_pm_power_off(void)
 {
@@ -1789,13 +1788,12 @@ static void msm_pm_power_off(void)
 #endif
 #if defined(CONFIG_LGE_RAM_CONSOLE_CLEAN)
 	ram_console_clean_buffer();
-#endif
+#endif /*CONFIG_LGE_RAM_CONSOLE_CLEAN*/
 
 #ifdef CONFIG_LGE_ERS
 	/* To prevent Phone freezing during power off */
-	smsm_change_state_nonotify(SMSM_APPS_STATE,
-							  0, SMSM_SYSTEM_POWER_DOWN);
-#endif
+	smsm_change_state_nonotify(SMSM_APPS_STATE, 0, SMSM_SYSTEM_POWER_DOWN);
+#endif /*CONFIG_LGE_ERS*/
 
 	msm_rpcrouter_close();
 	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
@@ -1815,7 +1813,7 @@ static void msm_pm_restart(char str, const char *cmd)
 	 * from google's mahimahi kernel
 	 */
 	msm_pm_flush_console();
-#endif
+#endif /*CONFIG_LGE_ERS*/
 
 	msm_rpcrouter_close();
 	msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
@@ -1857,7 +1855,7 @@ void lge_set_reboot_reason(unsigned int reason)
 
 	return;
 }
-#endif
+#endif /*CONFIG_LGE_ERS*/
 
 /******************************************************************************
  *

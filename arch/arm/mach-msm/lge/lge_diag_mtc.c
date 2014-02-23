@@ -78,9 +78,6 @@ extern PACK(void *) diagpkt_alloc2 (diagpkt_cmd_code_type code, unsigned int len
 extern PACK(void *) diagpkt_free (PACK(void *)pkt);
 extern void send_to_arm9( void*	pReq, void	*pRsp);
 
-extern void* lg_diag_req_pkt_ptr;
-extern uint16 lg_diag_req_pkt_length;
-
 #ifdef CONFIG_LGE_DIAG_ATS_ETA_MTC_KEY_LOGGING
 extern unsigned long int ats_mtc_log_mask;
 extern void diagpkt_commit (PACK(void *)pkt);
@@ -103,6 +100,14 @@ extern int base64_encode(char *text, int numBytes, char *encodedText);
 
 extern mtc_user_table_entry_type mtc_mstr_tbl[MTC_MSTR_TBL_SIZE];
 
+//LGE_CHANGE_S [20110208] myeonggyu.son@lge.com [gelato] mtc touch logging [START]
+#ifdef CONFIG_MACH_LGE_M3S
+// temp blocked - myeonggyu.son@lge.com
+//extern uint16_t max_x;
+//extern uint16_t max_y;
+#endif
+//LGE_CHANGE_E [20110208] myeonggyu.son@lge.com [gelato] mtc touch logging [END]
+
 unsigned char g_diag_mtc_check = 0;
 unsigned char g_diag_mtc_capture_rsp_num = 0;
 
@@ -116,10 +121,7 @@ static mtc_lcd_info_type lcd_info;
 static int ats_mtc_set_lcd_info (mtc_scrn_id_type ScreenType);
 static ssize_t read_framebuffer(byte* pBuf);
 
-//static char bmp_data_array[MTC_SCRN_BUF_SIZE_MAX];
-
-unsigned char lge_img_capture_32bpp[MTC_SCRN_BUF_32BPP_SIZE];
-unsigned char lge_img_capture_16bpp[MTC_SCRN_BUF_SIZE_MAX];
+static unsigned char bmp_data_array[MTC_SCRN_BUF_SIZE_MAX];
 
 /*===========================================================================
 
@@ -140,9 +142,6 @@ PACK (void *)LGF_MTCProcess (
   	mtc_running = 1;
 #endif //SPRINT_SLATE_KEYPRESS_TEST
 
-	lg_diag_req_pkt_ptr = req_pkt_ptr;
-	lg_diag_req_pkt_length = pkt_len;
-
   	for( nIndex = 0 ; nIndex < MTC_MSTR_TBL_SIZE  ; nIndex++)
   	{
     	if( mtc_mstr_tbl[nIndex].cmd_code == req_ptr->hdr.sub_cmd)
@@ -156,15 +155,12 @@ PACK (void *)LGF_MTCProcess (
     	else
       		continue;
   	}
-#ifdef MTC_DBG
+
   	printk(KERN_INFO "[MTC]cmd_code : [0x%X], sub_cmd : [0x%X]\n",req_ptr->hdr.cmd_code, req_ptr->hdr.sub_cmd);
-#endif
 
   	if( func_ptr != NULL)
   	{
-#ifdef MTC_DBG  
     	printk(KERN_INFO "[MTC]cmd_code : [0x%X], sub_cmd : [0x%X]\n",req_ptr->hdr.cmd_code, req_ptr->hdr.sub_cmd);
-#endif
     	rsp_ptr = func_ptr((DIAG_MTC_F_req_type*)req_ptr);
   	}
 //	else
@@ -337,6 +333,184 @@ unsigned long convert_32_to_16_bpp(byte* target_buf, byte* src_buf)
   return dst_cnt;
 }
 
+DIAG_MTC_F_rsp_type* mtc_capture_screen(DIAG_MTC_F_req_type *pReq)
+{
+  	unsigned int rsp_len,packet_len;
+  	DIAG_MTC_F_rsp_type *pRsp;
+  	ssize_t bmp_size;
+#if 0
+    int j, ret, x;
+    int size;
+    char *data;
+    char *data_buf;
+    uint16 h;
+#endif
+
+    uint8 red, green, blue;
+    int width, height,x_offset,y_offset;
+    int input;
+    int y;
+
+#if 1 //SLATE_CROPPED_CAPTURE
+    int x_start=0, y_start=0, x_end=0, y_end=0, i;
+	byte *pImgBlock;;
+	
+	x_start = pReq->mtc_req.capture.left; 			y_start = pReq->mtc_req.capture.top;
+	x_end = x_start + pReq->mtc_req.capture.width;	y_end = y_start + pReq->mtc_req.capture.height;
+#endif //SLATE_CROPPED_CAPTURE
+
+	printk(KERN_INFO "[MTC]mtc_capture_screen : upper_left_x=%d, upper_left_y=%d, bottom_right_x=%d, bottom_right_y=%d\n",x_start,y_start,x_end,y_end);
+
+  	rsp_len = sizeof(mtc_capture_rsp_type);
+	packet_len = rsp_len - (( MTC_SCRN_BUF_SIZE_MAX) )+ ((x_end-x_start)*((y_end-y_start)*sizeof(unsigned short)));
+	printk(KERN_INFO "[MTC] mtc_capture_screen rsp_len :(%d), packet_len :(%d)\n", rsp_len, packet_len);
+
+#if 1 //SLATE_CROPPED_CAPTURE
+	pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc2(DIAG_MTC_F, rsp_len, packet_len);
+  	if (pRsp == NULL) {
+		printk(KERN_ERR "[MTC] diagpkt_alloc failed\n");
+		return NULL;
+  	}
+#else
+	pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc(DIAG_MTC_F, rsp_len);
+  	if (pRsp == NULL) {
+		printk(KERN_ERR "[MTC] diagpkt_alloc failed\n");
+		return NULL;
+  	}
+#endif //SLATE_CROPPED_CAPTURE
+
+  	pRsp->hdr.cmd_code = DIAG_MTC_F;
+  	pRsp->hdr.sub_cmd = MTC_CAPTURE_REQ_CMD;
+  	g_diag_mtc_capture_rsp_num = MTC_CAPTURE_REQ_CMD;
+
+#if 1 //SLATE_CROPPED_CAPTURE
+
+#if 0//joosang.lee@lge.com
+	memset(tmp_img_block, 0x00, sizeof(tmp_img_block));
+	bmp_size = read_framebuffer((byte*)tmp_img_block);
+	pImgBlock = pRsp->mtc_rsp.capture.bmp_data;
+
+	memset(pRsp->mtc_rsp.capture.bmp_data, 0, MTC_SCRN_BUF_SIZE_MAX);
+	for(j=0;j<480;j++)
+	{
+		for(i=0;i<320;i++)
+		{
+			if(((i>=x_start) && (i<x_end)) && ((j>=y_start) && (j<y_end)))
+			{
+				*pImgBlock++ = tmp_img_block[(j*320)+i];
+			}
+		}
+	}
+#else
+
+	input = 0;
+
+	x_offset = pReq->mtc_req.capture.left;
+	y_offset = pReq->mtc_req.capture.top;
+	
+	if(pReq->mtc_req.capture.width > 0)		
+		width = pReq->mtc_req.capture.width;
+	else
+		width = 320;
+	
+	if(pReq->mtc_req.capture.height > 0)		
+		height = pReq->mtc_req.capture.height;
+	else
+		height = 480;
+
+	memset(tmp_img_block, 0x00, sizeof(tmp_img_block));
+	bmp_size = read_framebuffer((byte*)tmp_img_block);
+    printk(KERN_INFO"bmp_size = %ld , width=%ld, height=%ld\n", bmp_size, width, height );
+	pImgBlock = pRsp->mtc_rsp.capture.bmp_data;
+
+	memset(pRsp->mtc_rsp.capture.bmp_data, 0, MTC_SCRN_BUF_SIZE_MAX);
+
+#if 1
+	for (y = y_offset; y < (y_offset + height); y++) 
+	{
+		x_start = (y*320*4) + x_offset*4;
+		x_end = (y*320*4) + (x_offset+width)*4;
+		for (i = x_start; i < x_end; i += 4) 
+		{
+         #if 1
+         /*   GGL_PIXEL_FORMAT_RGBX_8888 : convert to RGB_565
+         blue.offset = 8;
+         green.offset = 16;
+         red.offset = 24;
+         transp.offset = 0;
+         */
+         #if 1
+         red = ((tmp_img_block[i]>>3)&0x1F);  
+         green = ((tmp_img_block[i+1]>>2)&0x3F);
+         blue = ((tmp_img_block[i+2]>>3)&0x1F);
+         // ignore alpa (every 4th bit)
+         pImgBlock[input++] = ((green&0x07)<<5)|blue;
+         pImgBlock[input++] = ((red<<3)&0xF8)|((green>>3)&0x07);
+         #else
+         pImgBlock[input++] = tmp_img_block[i];
+         pImgBlock[input++] = tmp_img_block[i+2];
+         pImgBlock[input++] = tmp_img_block[i+3];
+         pImgBlock[input++] = 0xFF;// ignore alpa (every 4th bit)
+         #endif
+         
+         #else
+         red=tmp_img_block[i+3];
+         green=tmp_img_block[i+2];
+         blue=tmp_img_block[i+1];
+         
+         h=(((red & 0xF8) << 8) | ((green & 0xFC) << 3) | ((blue & 0xF8) >> 3));
+         
+         pImgBlock[i/4]=h;
+
+         #endif
+		}
+	}   
+#else
+#if 0
+  	for(i=0; i<(320*480*4); i+=4){
+		red=tmp_img_block[i+3];
+		green=tmp_img_block[i+2];
+		blue=tmp_img_block[i+1];
+		
+		h=(((red & 0x00F8) << 8) | ((green & 0x00FC) << 3) | ((blue & 0x00F8) >> 3));
+
+		pImgBlock[i/4]=h;
+	
+	}
+#else
+   convert_32_to_16_bpp( pImgBlock, tmp_img_block);
+
+#endif
+
+#endif
+   
+#endif
+
+#else
+	bmp_size = read_framebuffer((byte*)pRsp->mtc_rsp.capture.bmp_data);
+
+	printk(KERN_INFO "[MTC]mtc_capture_screen, Read framebuffer & Bmp convert complete.. %d\n", (int)bmp_size);
+#endif //SLATE_CROPPED_CAPTURE
+
+  	pRsp->mtc_rsp.capture.scrn_id = lcd_info.id;
+#if 1 //SLATE_CROPPED_CAPTURE
+	pRsp->mtc_rsp.capture.bmp_width = x_end - x_start;
+	pRsp->mtc_rsp.capture.bmp_height = y_end - y_start;
+#else
+	pRsp->mtc_rsp.capture.bmp_width = lcd_info.width_max;
+  	pRsp->mtc_rsp.capture.bmp_height = lcd_info.height_max;
+#endif
+  	pRsp->mtc_rsp.capture.bits_pixel = 16;//lcd_info.bits_pixel;
+  	pRsp->mtc_rsp.capture.mask.blue = lcd_info.mask.blue;
+  	pRsp->mtc_rsp.capture.mask.green = lcd_info.mask.green;
+  	pRsp->mtc_rsp.capture.mask.red = lcd_info.mask.red;
+
+//joosang.lee@lge.com
+   printk(KERN_INFO "\n Complete Capture Screen \n");
+
+  	return pRsp;
+}
+
 DEFINE_SPINLOCK( mtc_spinlock );
 
 static ssize_t read_framebuffer(byte* pBuf)
@@ -497,83 +671,41 @@ EXPORT_SYMBOL(mtc_send_key_log_data);
 
 DIAG_MTC_F_rsp_type* mtc_serialized_data_req_proc(DIAG_MTC_F_req_type *pReq)
 {
-  unsigned int rsp_len;
-  DIAG_MTC_F_rsp_type *pRsp;
-  static unsigned long bmp_sent_cnt = 0; // save PMP data sent count
-// BEGIN: 0010599 alan.park@lge.com 2010.11.07 
-// ADD	0010599: [ETA/MTC] MTC capture ¹× touch ±â´É
-  static ssize_t read_size = 0; // save BMP data read count
-  unsigned int left_size = 0;
+  	unsigned int rsp_len;
+  	DIAG_MTC_F_rsp_type *pRsp;
+  	static unsigned long bmp_sent_cnt = 0;
+
+  	rsp_len = sizeof(mtc_serialized_data_rsp_type);
+  	printk(KERN_INFO "[MTC] mtc_serialized_data_req_proc rsp_len :(%d)\n", rsp_len);
+
+  	pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc(DIAG_MTC_F, rsp_len);
+  	if (pRsp == NULL) {
+  		printk(KERN_ERR "[MTC] diagpkt_alloc failed\n");
+    	return pRsp;
+  	}
+
+  	pRsp->hdr.cmd_code = DIAG_MTC_F;
+  	pRsp->hdr.sub_cmd = MTC_SERIALIZED_DATA_REQ_CMD;
+  	g_diag_mtc_capture_rsp_num = MTC_SERIALIZED_DATA_REQ_CMD;
+
+  	if((bmp_sent_cnt+1)*MTC_SCRN_BUF_SIZE <= MTC_SCRN_BUF_SIZE_MAX)
+  	{
+    	pRsp->mtc_rsp.serial_data.seqeunce = bmp_sent_cnt;
+    	pRsp->mtc_rsp.serial_data.length = MTC_SCRN_BUF_SIZE;
+
+		memset((void*)pRsp->mtc_rsp.serial_data.bmp_data, 0, MTC_SCRN_BUF_SIZE);
+    	memcpy((void*)pRsp->mtc_rsp.serial_data.bmp_data, (void*)(bmp_data_array+bmp_sent_cnt*MTC_SCRN_BUF_SIZE), MTC_SCRN_BUF_SIZE);
   
-  struct file *phMscd_Filp = NULL;
+    	bmp_sent_cnt++;
+  	}
+
+  	if(bmp_sent_cnt*MTC_SCRN_BUF_SIZE >= MTC_SCRN_BUF_SIZE_MAX)
+  	{
+    	pRsp->mtc_rsp.serial_data.seqeunce = 0xFFFF;
+    	bmp_sent_cnt = 0;
+  	}
   
-  mm_segment_t old_fs;
-
-  if(bmp_sent_cnt == 0) // read only once
-  {
-	old_fs=get_fs();
-	set_fs(get_ds());
-
-	phMscd_Filp = filp_open(ETA_MTC_BMP_DATA, O_RDONLY |O_LARGEFILE, 0);
-	if( !phMscd_Filp)
-	  printk(KERN_ERR "%s, open fail screen capture \n", __func__);
-
-	printk(KERN_INFO "%s, %s offset : %d\n", __func__, ETA_MTC_BMP_DATA, (int)phMscd_Filp->f_pos);
-	phMscd_Filp->f_pos = ETA_MTC_BMP_HEADER_CNT;
-	printk(KERN_INFO "%s, %s changed offset : %d for bmp header\n", __func__, ETA_MTC_BMP_DATA, (int)phMscd_Filp->f_pos);
-
-	read_size = phMscd_Filp->f_op->read(phMscd_Filp, lge_img_capture_16bpp, MTC_SCRN_BUF_SIZE_MAX, &phMscd_Filp->f_pos);
-	printk(KERN_INFO "%s, read size : %d(0x%X) \n", __func__, read_size, read_size);
-
-	filp_close(phMscd_Filp,NULL);
-	set_fs(old_fs);
-  }
-
-  rsp_len = sizeof(mtc_serialized_data_rsp_type);
-#ifdef MTC_DBG
-  printk(KERN_INFO "%s, rsp_len :(%d)\n", __func__, rsp_len);
-#endif
-
-  pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc(DIAG_MTC_F, rsp_len);
-  if (pRsp == NULL) {
-	printk(KERN_ERR "%s, diagpkt_alloc failed\n", __func__);
-	return pRsp;
-  }
-
-  pRsp->hdr.cmd_code = DIAG_MTC_F;
-  pRsp->hdr.sub_cmd = MTC_SERIALIZED_DATA_REQ_CMD;
-  
-  if((bmp_sent_cnt+1)*MTC_SCRN_BUF_SIZE < read_size) // more than data pkt size
-  {
-	pRsp->mtc_rsp.serial_data.seqeunce = bmp_sent_cnt;
-	pRsp->mtc_rsp.serial_data.length = MTC_SCRN_BUF_SIZE;
-
-#ifdef MTC_DBG
-	memset((void*)pRsp->mtc_rsp.serial_data.bmp_data, 0, MTC_SCRN_BUF_SIZE);  
-#endif
-	memcpy((void*)pRsp->mtc_rsp.serial_data.bmp_data, (void*)(lge_img_capture_16bpp+bmp_sent_cnt*MTC_SCRN_BUF_SIZE), MTC_SCRN_BUF_SIZE);
-
-	bmp_sent_cnt++;
-
-	left_size = read_size - bmp_sent_cnt*MTC_SCRN_BUF_SIZE;
-#ifdef MTC_DBG
-	printk(KERN_INFO "%s, sent_cnt : %d(0x%X), left : %d(0x%X)\n", __func__, bmp_sent_cnt, bmp_sent_cnt, left_size, left_size);
-#endif
-  }
-  else // less than data pkt size
-  {
-	pRsp->mtc_rsp.serial_data.seqeunce = 0xFFFF;
-
-	pRsp->mtc_rsp.serial_data.length = read_size - bmp_sent_cnt*MTC_SCRN_BUF_SIZE;
-	memset((void*)pRsp->mtc_rsp.serial_data.bmp_data, 0, MTC_SCRN_BUF_SIZE);
-	memcpy((void*)pRsp->mtc_rsp.serial_data.bmp_data, (void*)(lge_img_capture_16bpp+bmp_sent_cnt*MTC_SCRN_BUF_SIZE), pRsp->mtc_rsp.serial_data.length);
-  
-	bmp_sent_cnt = 0;
-
-	printk(KERN_INFO "%s, last_pkt len : %d(0x%X)\n", __func__, (int)pRsp->mtc_rsp.serial_data.length, (int)pRsp->mtc_rsp.serial_data.length);
-  }
-  
-  return pRsp;
+  	return pRsp;
 }
 
 DIAG_MTC_F_rsp_type* mtc_serialized_capture_req_proc(DIAG_MTC_F_req_type *pReq)
@@ -603,9 +735,9 @@ DIAG_MTC_F_rsp_type* mtc_serialized_capture_req_proc(DIAG_MTC_F_req_type *pReq)
   	pRsp->mtc_rsp.serial_capture.mask.green = lcd_info.mask.green;
   	pRsp->mtc_rsp.serial_capture.mask.red = lcd_info.mask.red;
 
-  	memset(lge_img_capture_16bpp, 0, MTC_SCRN_BUF_SIZE_MAX);
+  	memset(bmp_data_array, 0, MTC_SCRN_BUF_SIZE_MAX);
 
-  	bmp_size = read_framebuffer((byte*)lge_img_capture_16bpp);
+  	bmp_size = read_framebuffer((byte*)bmp_data_array);
   	printk(KERN_INFO "[MTC]mtc_serialized_capture_req_proc, Read framebuffer & Bmp convert complete.. %d\n", (int)bmp_size);
 
   	return pRsp;
@@ -636,6 +768,11 @@ DIAG_MTC_F_rsp_type* mtc_execute(DIAG_MTC_F_req_type *pReq)
   	char cmdstr[100];
 	int fd;
 
+  	unsigned int req_len = 0;
+  	unsigned int rsp_len = 0;
+  	DIAG_MTC_F_rsp_type *pRsp = (void *)NULL;
+  	unsigned char *mtc_cmd_buf_encoded = NULL;
+  	int lenb64 = 0;
   
   	char *envp[] = {
   		"HOME=/",
@@ -644,34 +781,86 @@ DIAG_MTC_F_rsp_type* mtc_execute(DIAG_MTC_F_req_type *pReq)
   	};
   
   	char *argv[] = {
-  		"sh",
-  		"-c",
+		"/system/bin/mtc",
   		cmdstr,
   		NULL,
   	};
 
-	printk(KERN_INFO "%s, %d, %d\n", __func__, (int)pReq->hdr.cmd_code, (int)pReq->hdr.sub_cmd);
-
-	if ( (fd = sys_open((const char __user *)MTC_MODULE, O_RDONLY ,0) ) < 0 )
+  	printk(KERN_INFO "[MTC]mtc_execute\n");
+  
+  	switch(pReq->hdr.sub_cmd)
   	{
-		printk(KERN_ERR "\n%s, can not open %s\n", __func__, MTC_MODULE);
-		sprintf(cmdstr, "%s", MTC_MODULE);
+    	case MTC_KEY_EVENT_REQ_CMD:
+      		req_len = sizeof(mtc_key_req_type);
+      		rsp_len = sizeof(mtc_key_req_type);
+      		printk(KERN_INFO "[MTC] KEY_EVENT_REQ rsp_len :(%d)\n", rsp_len);
+
+	  		pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc(DIAG_MTC_F, rsp_len);
+      		if (pRsp == NULL) {
+        		printk(KERN_ERR "[MTC] diagpkt_alloc failed\n");
+        		return pRsp;
+      		}
+      		pRsp->mtc_rsp.key.hold = pReq->mtc_req.key.hold;
+      		pRsp->mtc_rsp.key.key_code = pReq->mtc_req.key.key_code;
+      		break;
+
+    	case MTC_TOUCH_REQ_CMD:
+      		req_len = sizeof(mtc_touch_req_type);
+      		rsp_len = sizeof(mtc_touch_req_type);
+      		printk(KERN_INFO "[MTC] TOUCH_EVENT_REQ rsp_len :(%d)\n", rsp_len);
+
+	  		pRsp = (DIAG_MTC_F_rsp_type *)diagpkt_alloc(DIAG_MTC_F, rsp_len);
+      		if (pRsp == NULL) {
+        		printk(KERN_ERR "[MTC] diagpkt_alloc failed\n");
+        		return pRsp;
+      		}
+      		pRsp->mtc_rsp.touch.screen_id = pReq->mtc_req.touch.screen_id;
+      		pRsp->mtc_rsp.touch.action = pReq->mtc_req.touch.action;
+      		pRsp->mtc_rsp.touch.x = pReq->mtc_req.touch.x;
+      		pRsp->mtc_rsp.touch.y = pReq->mtc_req.touch.y;
+      		break;
+
+    	default:
+      		printk(KERN_ERR "[MTC] unknown sub_cmd : (%d)\n", pReq->hdr.sub_cmd);
+      		break;
+  	}
+
+  	pRsp->hdr.cmd_code = pReq->hdr.cmd_code;
+  	pRsp->hdr.sub_cmd = pReq->hdr.sub_cmd;
+
+  	mtc_cmd_buf_encoded = kmalloc(sizeof(unsigned char)*50, GFP_KERNEL);
+  	memset(cmdstr,0x00, 50);
+  	memset(mtc_cmd_buf_encoded,0x00, 50);
+
+  	lenb64 = base64_encode((char *)pReq, req_len, (char *)mtc_cmd_buf_encoded);
+
+  	if ( (fd = sys_open((const char __user *) "/system/bin/mtc", O_RDONLY ,0) ) < 0 )
+  	{
+  		printk("\n [MTC]can not open /system/bin/mtc - execute /system/bin/mtc\n");
+  		sprintf(cmdstr, "/system/bin/mtc ");
   	}
   	else
   	{
-		sprintf(cmdstr, "%s", MTC_MODULE);
+		memcpy((void*)cmdstr, (void*)mtc_cmd_buf_encoded, lenb64);
+#if 0
+		printk("[MTC] cmdstr[16] : %d, cmdstr[17] : %d, cmdstr[18] : %d", cmdstr[16], cmdstr[17], cmdstr[18]);
+		printk("[MTC] cmdstr[19] : %d, cmdstr[20] : %d, cmdstr[21] : %d", cmdstr[19], cmdstr[20], cmdstr[21]);
+#endif	
+		printk("\n [MTC]execute /system/bin/mtc, %s\n", cmdstr);
   		sys_close(fd);
   	}
+  	// END: eternalblue@lge.com.2009-10-23
   
-	printk(KERN_INFO "%s, execute mtc : data - %s\n\n", __func__, cmdstr);
-	if ((ret =
-		call_usermodehelper("/system/bin/sh", argv, envp, UMH_WAIT_PROC)) != 0) {
-		printk(KERN_ERR "%s, MTC failed to run : %i\n", __func__, ret);
-	}
-	else
-		printk(KERN_INFO "%s, execute ok, ret = %d\n", __func__, ret);
+  	printk(KERN_INFO "[MTC]execute mtc : data - %s\n\n", cmdstr);
+  	if ((ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC)) != 0) {
+	  	printk(KERN_ERR "[MTC]MTC failed to run : %i\n", ret);
+  	}
+  	else
+  		printk(KERN_INFO "[MTC]execute ok, ret = %d\n", ret);
+
+  	kfree(mtc_cmd_buf_encoded);
   
-  return NULL;
+  	return pRsp;
 }
 EXPORT_SYMBOL(mtc_execute);
 
@@ -835,8 +1024,8 @@ void mtc_send_touch_log_packet(unsigned long touch_x, unsigned long touch_y, uns
 	msg.args[1] = touch_x*320/max_x;
 	msg.args[2] = touch_y*480/max_y;
 #else
-	msg.args[1] = touch_x*320;
-	msg.args[2] = touch_y*480;
+	msg.args[1] = touch_x;
+	msg.args[2] = touch_y;
 #endif
 	memcpy(&msg.code[0], "PenEvent %d,%d", sizeof("PenEvent %d,%d"));
 	//msg.code[12] = '\0';
@@ -858,8 +1047,8 @@ EXPORT_SYMBOL(mtc_send_touch_log_packet);
 mtc_user_table_entry_type mtc_mstr_tbl[MTC_MSTR_TBL_SIZE] =
 { 
 /*	sub_command							fun_ptr								which procesor              */
-	{ MTC_INFO_REQ_CMD					,mtc_execute						, MTC_ARM11_PROCESSOR},
-	{ MTC_CAPTURE_REQ_CMD				,mtc_null_rsp						, MTC_ARM11_PROCESSOR},
+	{ MTC_INFO_REQ_CMD					,mtc_info_req_proc					, MTC_ARM11_PROCESSOR},
+	{ MTC_CAPTURE_REQ_CMD				,mtc_capture_screen					, MTC_ARM11_PROCESSOR},
 	{ MTC_KEY_EVENT_REQ_CMD				,mtc_execute						, MTC_ARM11_PROCESSOR},
 	{ MTC_TOUCH_REQ_CMD					,mtc_execute						, MTC_ARM11_PROCESSOR},
 #ifdef CONFIG_LGE_DIAG_ATS_ETA_MTC_KEY_LOGGING
@@ -867,8 +1056,7 @@ mtc_user_table_entry_type mtc_mstr_tbl[MTC_MSTR_TBL_SIZE] =
 	{ MTC_LOG_REQ_CMD					,mtc_null_rsp						, MTC_ARM11_PROCESSOR}, /*mtc_send_key_log_data*/
 #endif 
 	{ MTC_SERIALIZED_DATA_REQ_CMD		,mtc_serialized_data_req_proc		, MTC_ARM11_PROCESSOR},
-	/*{ MTC_SERIALIZED_CAPTURE_REQ_CMD 	,mtc_serialized_capture_req_proc	, MTC_ARM11_PROCESSOR},*/
-	{ MTC_SERIALIZED_CAPTURE_REQ_CMD	,mtc_execute						, MTC_ARM11_PROCESSOR},
+	{ MTC_SERIALIZED_CAPTURE_REQ_CMD 	,mtc_serialized_capture_req_proc	, MTC_ARM11_PROCESSOR},
 	{ MTC_PHONE_RESTART_REQ_CMD			,mtc_null_rsp						, MTC_ARM9_PROCESSOR},
 	{ MTC_FACTORY_RESET					,mtc_null_rsp						, MTC_ARM9_ARM11_BOTH},
 	{ MTC_PHONE_REPORT					,mtc_null_rsp						, MTC_ARM9_PROCESSOR},

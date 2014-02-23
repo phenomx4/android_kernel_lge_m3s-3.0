@@ -577,7 +577,9 @@ struct platform_device msm_device_otg = {
 };
 
 struct flash_platform_data msm_nand_data = {
-	.version = VERSION_2,
+	.parts		= NULL,
+	.nr_parts	= 0,
+	.interleave     = 0,
 };
 
 struct platform_device msm_device_nand = {
@@ -722,8 +724,8 @@ static struct resource resources_sdc2[] = {
 	},
 	{
 		.name	= "sdcc_dma_chnl",
-		.start	= DMOV_NAND_CHAN,
-		.end	= DMOV_NAND_CHAN,
+		.start	= DMOV_SDC2_CHAN,
+		.end	= DMOV_SDC2_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
@@ -1223,7 +1225,7 @@ static struct resource kgsl_2d0_resources[] = {
 static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 	.pwrlevel = {
 		{
-			.gpu_freq = 192000000,
+			.gpu_freq = 0,
 			.bus_freq = 192000000,
 		},
 	},
@@ -1302,24 +1304,14 @@ static struct platform_device ram_console_device = {
 void __init lge_add_ramconsole_devices(void)
 {
 	struct resource *res = ram_console_resource;
-#if defined (CONFIG_MACH_LGE_M3S) || defined(CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 /*
 	CONFIG_MACH_LGE_M3S
 	meminfo = (
-	  nr_banks = 0x3,
+	  nr_banks = 0x2,
 	  bank = (
-		[0](start = 0x00200000, size = 0x03C00000, node = 0x0, highmem = 0x0),
-		[1](start = 0x07B00000, size = 0x08400000, node = 0x0, highmem = 0x0),
-		[2](start = 0x20000000, size = 0x10000000, node = 0x0, highmem = 0x0),
-*/
-/*
-	CONFIG_MACH_MSM7630_U0
-	meminfo = (
-	  nr_banks = 0x3,
-	  bank = (
-		[0](start = 0x00200000, size = 0x03C00000, node = 0x0, highmem = 0x0),
-		[1](start = 0x07B00000, size = 0x08400000, node = 0x0, highmem = 0x0),
-		[2](start = 0x40000000, size = 0x10000000, node = 0x0, highmem = 0x0),
+		(start = 0x00200000, size = 0x03C00000, node = 0x0, highmem = 0x0),
+		(start = 0x07A00000, size = 0x08500000, node = 0x0, highmem = 0x0),
 */
 	struct membank *bank;
 

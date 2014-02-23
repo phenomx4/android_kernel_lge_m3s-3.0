@@ -50,34 +50,33 @@ static ssize_t return_store(struct device *dev, struct device_attribute *attr, c
 	return count;
 }
 // LGE_CHANGE_E [myeonggyu.son@lge.com] [2011.02.21] [gelato] add diag sysfs [END]
-// LGE_CHANGE_S [hyeongnam.jang@lge.com, 2012.02.22, US730] add diag sysfs
-static ssize_t result_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-    return sprintf(buf, "%s\n", process_status);
-}
-// LGE_CHANGE_E [hyeongnam.jang@lge.com, 2012.02.22, US730] add diag sysfs
-
 // LGE_CHANGE_S [addy.kim@lge.com] [2011.02.21] [M3S] add diag sysfs [START]
-static int nfc_result;
+static char nfc_result_str[100];
 static ssize_t nfc_result_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-	   printk("\n%s:%s\n", __func__,buf);
-	   sscanf(buf,"%d",&nfc_result);
+//	   printk("\n%s:%s\n", __func__,buf);
+	   memset(nfc_result_str, 0x00, sizeof(nfc_result_str));
+	   strcpy(nfc_result_str, buf);
+//	   sscanf(buf,"%d",nfc_result_str);
 	   return count;
 }
 
-static ssize_t nfc_result_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t result_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    return sprintf(buf, "%d\n", nfc_result);
+    return sprintf(buf, "%s\n", nfc_result_str);
 }
 
-static DEVICE_ATTR(nfc_testmode_result, S_IRUGO | S_IWUSR | S_IWGRP, nfc_result_show, nfc_result_store);
+
+
+static DEVICE_ATTR(nfc_testmode_result, S_IRUGO | S_IWUSR | S_IWGRP, result_show, nfc_result_store);
 // LGE_CHANGE_S [addy.kim@lge.com] [2011.02.21] [M3S] add diag sysfs [END]
 
 static DEVICE_ATTR(state, S_IRUGO | S_IWUSR, state_show, NULL);
 static DEVICE_ATTR(name, S_IRUGO | S_IWUSR, name_show, NULL);
-static DEVICE_ATTR(result, S_IRUGO | S_IWUSR | S_IWGRP, result_show, result_store);
-static DEVICE_ATTR(return, S_IRUGO | S_IWUSR | S_IWGRP, NULL, return_store);
+// LGE_CHANGE_S [myeonggyu.son@lge.com] [2011.02.21] [gelato] add diag sysfs [START]
+static DEVICE_ATTR(result, S_IRUGO | S_IWUSR | S_IWGRP | S_IWOTH, NULL, result_store);
+static DEVICE_ATTR(return, S_IRUGO | S_IWUSR | S_IWGRP | S_IWOTH, NULL, return_store);
+// LGE_CHANGE_E [myeonggyu.son@lge.com] [2011.02.21] [gelato] add diag sysfs [END]
 
 void update_diagcmd_state(struct diagcmd_dev *sdev, char *cmd, int state)
 {
@@ -206,7 +205,7 @@ void diagcmd_dev_unregister(struct diagcmd_dev *sdev)
 	device_remove_file(sdev->dev, &dev_attr_state);
 	// LGE_CHANGE_S [myeonggyu.son@lge.com] [2011.02.21] [gelato] add diag sysfs [START]
 	device_remove_file(sdev->dev, &dev_attr_result);
-	device_remove_file(sdev->dev, &dev_attr_return);
+    device_remove_file(sdev->dev, &dev_attr_return);
 	// LGE_CHANGE_E [myeonggyu.son@lge.com] [2011.02.21] [gelato] add diag sysfs [END]
 	device_destroy(lg_fw_diag_class, MKDEV(0, sdev->index));
 	dev_set_drvdata(sdev->dev, NULL);

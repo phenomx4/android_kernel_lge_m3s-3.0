@@ -26,7 +26,7 @@
  */
 #define MSM7X27_EBI1_CS0_BASE	PHYS_OFFSET
 #define MSM7X30_EBI1_CS0_BASE	PHYS_OFFSET
-#define LGE_RAM_CONSOLE_SIZE    (256 * SZ_1K * 2)
+#define LGE_RAM_CONSOLE_SIZE    (128 * SZ_1K * 2)
 
 void __init lge_add_ramconsole_devices(void);
 #endif /*CONFIG_LGE_RAM_CONSOLE*/

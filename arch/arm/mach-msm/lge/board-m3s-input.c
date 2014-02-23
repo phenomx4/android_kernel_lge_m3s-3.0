@@ -668,149 +668,140 @@ static void __init m3eu_init_i2c_ecom(int bus_num, bool platform)
 	}
 }
 
-/* proximity */
-/*
-static void m3s_proximity_sensor_gpio_config(int onoff)
+/*LGE_CHANGE_S(MACRO) [hyeongnam.jang@lge.com, 2012-01-19] to support proxi sensor*/
+#define PROXI_GPIO_I2C_SDA	172
+#define PROXI_GPIO_I2C_SCL	173
+#define PROXI_GPIO_DOUT		50
+
+#define PROXI_I2C_ADDRESS	0x44
+
+#define STATE_WAKE			1
+#define STATE_SLEEP			0
+
+#define	PROX_OPMODE_A		0x0
+#define	PROX_OPMODE_B1		0x1
+#define	PROX_OPMODE_B2		0x2
+
+#define PROXI_NORMAL_MODE       0	
+#define PROXI_INTERRUPT_MODE    1
+/*LGE_CHANGE_E(MACRO) [hyeongnam.jang@lge.com, 2012-01-19] to support proxi sensor*/
+
+/*LGE_CHANGE_S [hyeongnam.jang@lge.com, 2012-01-20] to support proxi sensor*/
+#if defined(CONFIG_SENSOR_GP2AP)
+static struct regulator * proxi_vreg_l8 = NULL;
+static int proxi_config_gpio(int config)
 {
+	printk(KERN_INFO "%s start config : %d\n", __func__, config);
+    if(config==STATE_WAKE)
+    {
+        /* for wake state */
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_DOUT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SDA, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+		// I2C_SCL pin is INPUT? check it later.
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SCL, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+    }
+    else
+    {		
+        /* for sleep state */
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_DOUT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SDA, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+        gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SCL, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+    }
+
+	printk(KERN_INFO "%s end\n", __func__);
+    return 0;
+}
+
+void proxi_set_regulator_ptr(struct regulator *rname)
+{
+	if(rname)
+		proxi_vreg_l8 = rname;
+	else
+    {
+        proxi_vreg_l8 = NULL;
+		printk(KERN_ERR "NULL regulator pointer\n");
+    }
+}
+struct regulator *proxi_get_regulator_ptr(void)
+{
+	if(proxi_vreg_l8 == NULL)
+		printk(KERN_ERR "regulator has not been initialized yet\n");
+	
+	return proxi_vreg_l8;
+}
+
+int proxi_power_set(unsigned char onoff)
+{
+    int proxi_rc;
+	
+    printk(KERN_INFO "[ProxiSensor D] %s: power %s\n", __func__, onoff ? "On" : "Off");
+
+	if(proxi_get_regulator_ptr() == NULL)
+	{
+		printk(KERN_INFO "regulator has not been initialized yet, request and set the voltage\n");
+
+		proxi_vreg_l8 = regulator_get(NULL, "ldo8");
+		if (IS_ERR(proxi_vreg_l8)) {
+			proxi_rc = PTR_ERR(proxi_vreg_l8);
+			pr_err("%s: could not get ldo: %d\n", __func__, proxi_rc);
+			goto out;
+		}
+
+		proxi_rc = regulator_set_voltage(proxi_vreg_l8, 2850000, 2850000);
+		if (proxi_rc) {
+			pr_err("%s: could not set ldo voltage: %d\n", __func__, proxi_rc);
+			goto reg_free;
+		}
+	}
+
 	if(onoff)
-	{
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SDA, 0, GPIO_CFG_OUTPUT,
-			GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SCL, 0, GPIO_CFG_OUTPUT,
-			GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_DOUT, 0, GPIO_CFG_INPUT,
-			GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-	}else
-	{
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SDA, 0, GPIO_CFG_OUTPUT,
-			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_I2C_SCL, 0, GPIO_CFG_OUTPUT,
-			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(PROXI_GPIO_DOUT, 0, GPIO_CFG_INPUT,
-			GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-	}
+    {
+        proxi_config_gpio(STATE_WAKE);
+
+		proxi_rc = regulator_enable(proxi_vreg_l8);
+		if (proxi_rc) {
+			pr_err("%s: could not enable ldo: %d\n", __func__, proxi_rc);
+			goto reg_free;
+		}
+    }
+    else
+    {
+        proxi_config_gpio(STATE_SLEEP);
+
+		proxi_rc = regulator_disable(proxi_vreg_l8);
+		if (proxi_rc) {
+			pr_err("%s: could not disable ldo: %d\n", __func__, proxi_rc);
+			goto reg_free;
+		}
+    }
+
+    return 0;
+
+reg_free:
+	regulator_put(proxi_vreg_l8);
+out:
+	printk(KERN_ERR "[ProxiSensor D] %s: power %s ERROR\n", __func__, onoff ? "On" : "Off");
+	proxi_set_regulator_ptr(NULL);
+	return proxi_rc;
 }
-*/
-static int prox_power_set(unsigned char onoff)
-{
-/* just return 0, later I'll fix it */
-	static bool init_done = 0;
-	
-	int ret = 0;
+#endif /* CONFIG_SENSOR_GP2AP */
+/*LGE_CHANGE_E [hyeongnam.jang@lge.com, 2012-01-20] to support proxi sensor*/
 
-#if 0
-/* need to be fixed  - for vreg using SUB PMIC */
-	struct regulator* ldo5 = NULL;
-
-	ldo5 = regulator_get(NULL, "RT8053_LDO5");
-	if (ldo5 == NULL) {
-		pr_err("%s: regulator_get(ldo5) failed\n", __func__);
-	}
-
-	printk("[Proximity] %s() : Power %s\n",__FUNCTION__, onoff ? "On" : "Off");
-	
-	if (init_done == 0 && onoff)
-	{
-		if (onoff) {
-			printk(KERN_INFO "LDO5 vreg set.\n");
-			ret = regulator_set_voltage(ldo5, 2800000, 2800000);
-			if (ret < 0) {
-				pr_err("%s: regulator_set_voltage(ldo5) failed\n", __func__);
-			}
-			ret = regulator_enable(ldo5);
-			if (ret < 0) {
-                pr_err("%s: regulator_enable(ldo5) failed\n", __func__);
-            }
-			
-			init_done = 1;
-		} else {
-			ret = regulator_disable(ldo5);
-			if (ret < 0) {
-                pr_err("%s: regulator_disable(ldo5) failed\n", __func__);
-            }
-
-		}
-	}
-
-#else
-
-	struct vreg *gp7_vreg    = vreg_get(0, "gp7");     //1V8_SENSOR
-	struct vreg *xo_out_vreg = vreg_get(0, "xo_out");  //2V85_PROXIMITY (from PM, not SubPMIC)
-	if (!gp7_vreg || !xo_out_vreg) {
-			printk("[smiledice] LG_FW : %s, can't get vreg_get\n",__func__);
-	}
-
-	printk("[Proximity] %s() : Power %s\n",__FUNCTION__, onoff ? "On" : "Off");
-	
-	if (onoff) 
-	{
-		if (init_done == 0)
-		{
-			printk(KERN_INFO "prox_power_on\n");
-			ret = vreg_set_level(xo_out_vreg, 2850);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_set_level(xo_out_vreg, 2850) return error %d\n",__func__, ret);
-			}
-			ret = vreg_set_level(gp7_vreg, 1800);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_set_level(gp7_vreg, 1800) return error %d\n",__func__, ret);
-			}
-
-			ret = vreg_enable(xo_out_vreg);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_enable(xo_out_vreg) return error %d\n",__func__, ret);
-			}
-
-			ret = vreg_enable(gp7_vreg);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_enable(gp7_vreg) return error %d\n",__func__, ret);
-			}
-//			m3s_proximity_sensor_gpio_config(1);
-			init_done = 1;
-		}
-	} 
-	else 
-	{
-		if (init_done == 1)
-		{
-			printk(KERN_INFO "prox_power_off\n");
-			ret = vreg_disable(xo_out_vreg);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_disable(xo_out_vreg) return error %d\n",__func__, ret);
-			}
-
-			ret = vreg_disable(gp7_vreg);
-			if (ret) {
-				printk("[smiledice] LG_FW : %s, \
-						vreg_disable(gp7_vreg) return error %d\n",__func__, ret);
-			}
-
-//			m3s_proximity_sensor_gpio_config(0);
-			init_done = 0;
-		}
-	}
-
-#endif
-
-	return ret;
-}
-
-// nb_jeans 120516  LS696 ¢®¨úUA¢®E¡§u¡§u¡§u¢®¨Ï ¡§uoA¡Ë¢¥¢®icC¢®¢¯ ¡Ë¡þOAo detection time(.cycle) 32(2) -> 8ms(0)
+/*LGE_CHANGE_S [hyeongnam.jang@lge.com, 2012-01-19] to support proxi sensor*/
+#if defined(CONFIG_SENSOR_GP2AP)
+/* If proxi_pdata.op_mode=PROX_OPMODE_A,            */
+/* proxi_pdata.methods must be PROXI_NORMAL_MODE    */
+/* For details, check the datasheet                 */
 static struct proximity_platform_data proxi_pdata = {
 	.irq_num	= PROXI_GPIO_DOUT,
-	.power		= prox_power_set,
-	.methods		= 1,
-	.operation_mode		= 1,
+	.power		= proxi_power_set,
+	.methods		= PROXI_NORMAL_MODE,
+	.operation_mode		= PROX_OPMODE_A,
 	.debounce	 = 0,
-	.cycle = 0,
+	.cycle = 2,
 };
 
-static struct i2c_board_info prox_i2c_bdinfo[] = {
+static struct i2c_board_info proxi_i2c_bdinfo[] = {
 	[0] = {
 		I2C_BOARD_INFO("proximity_gp2ap", PROXI_I2C_ADDRESS),
 		.type = "proximity_gp2ap",
@@ -834,29 +825,28 @@ static struct i2c_gpio_platform_data proxi_i2c_pdata = {
 };
 
 static struct platform_device proxi_i2c_device = {
-        .name = "i2c-gpio",
-        .dev.platform_data = &proxi_i2c_pdata,
+	.name = "i2c-gpio",
+	.dev.platform_data = &proxi_i2c_pdata,
 };
 
-static void __init m3eu_init_i2c_prox(int bus_num, bool platform)
+
+static void __init m3eu_init_i2c_proxi(int bus_num, bool platform)
 {
-	proxi_i2c_device.id = bus_num;
+    int rc=0;
+    proxi_i2c_device.id = bus_num;
 
-	printk("[smiledice] LG_FW : %s, bus_num is %d\n",__func__, bus_num);
-	
-	printk("[smiledice] LG_FW : %s : proxi_i2c_pin[0].irq_pin %d, proxi_i2c_pin[0].reset_pin %d, proxi_i2c_pin[0].scl_pin %d, proxi_i2c_pin[0].sda_pin %d\n",
-			__func__, 
-			proxi_i2c_pin[0].irq_pin, proxi_i2c_pin[0].reset_pin, 
-			proxi_i2c_pin[0].scl_pin, proxi_i2c_pin[0].sda_pin);
+    printk(KERN_INFO "[ProxiSensor D] %s: bus_num is %d, platform is %d\n", __func__, bus_num, platform);
+    printk(KERN_INFO "[ProxiSensor D] %s: proxi_i2c_pin[0].irq_pin %d, proxi_i2c_pin[0].reset_pin %d, proxi_i2c_pin[0].scl_pin %d, proxi_i2c_pin[0].sda_pin %d\n", 
+		__func__, proxi_i2c_pin[0].irq_pin, proxi_i2c_pin[0].reset_pin, proxi_i2c_pin[0].scl_pin, proxi_i2c_pin[0].sda_pin);
 
-	init_gpio_i2c_pin(&proxi_i2c_pdata, proxi_i2c_pin[0], &prox_i2c_bdinfo[0]);
-
-	i2c_register_board_info(bus_num, &prox_i2c_bdinfo[0], 1);
-	if(platform) {
-		platform_device_register(&proxi_i2c_device);
-	}
+    init_gpio_i2c_pin( &proxi_i2c_pdata, proxi_i2c_pin[0], &proxi_i2c_bdinfo[0]);
+    i2c_register_board_info( bus_num, &proxi_i2c_bdinfo[0], 1);
+    //XXX if(platform)
+    rc = platform_device_register(&proxi_i2c_device);
+    printk(KERN_INFO "[ProxiSensor D] %s: return code = %d\n", __func__, rc);
 }
-//LGE_CHANGE_E SENSOR FIRMWARE UPDATE (jongkwon.chae@lge.com)
+#endif /* CONFIG_SENSOR_GP2AP */
+/*LGE_CHANGE_E [hyeongnam.jang@lge.com, 2012-01-19] to support proxi sensor*/
 
 // matthew.choi@lge.com 111017 Add side volume keys [START]
 static struct platform_device *m3s_input_devices[] __initdata = {
@@ -873,7 +863,7 @@ void __init lge_add_input_devices(void)
 	//LGE_CHANGE_S SENSOR FIRMWARE UPDATE (jongkwon.chae@lge.com)
 	lge_add_gpio_i2c_device(m3eu_init_i2c_acceleration, &accel_i2c_pin[0]);
 	lge_add_gpio_i2c_device(m3eu_init_i2c_ecom, &ecom_i2c_pin[0]);
-	lge_add_gpio_i2c_device(m3eu_init_i2c_prox, &proxi_i2c_pin[0]);
+	lge_add_gpio_i2c_device(m3eu_init_i2c_proxi, &proxi_i2c_pin[0]);
 	//LGE_CHANGE_E SENSOR FIRMWARE UPDATE (jongkwon.chae@lge.com)
 
 #if defined(CONFIG_TOUCHSCREEN_MELFAS_TS)

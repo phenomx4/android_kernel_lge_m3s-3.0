@@ -124,7 +124,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
 	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
 	POWER_SUPPLY_PROP_SCOPE,
-#ifdef CONFIG_MACH_LGE_CHARGING	
+#if 1
 //wantaek.lim@lge.com 2012.06.28	
 	POWER_SUPPLY_PROP_XO_TEMP,
 #endif

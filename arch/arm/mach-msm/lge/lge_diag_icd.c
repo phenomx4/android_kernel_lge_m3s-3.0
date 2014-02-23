@@ -36,38 +36,27 @@
 #include <linux/jiffies.h>
 #include <linux/delay.h>
 
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 #include <mach/lge_diag_screen_shot.h>
 #include <linux/vmalloc.h>
 
 #define LCD_BUFFER_SIZE LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4
 #define CONVERT565(r, g, b) ( ((r >> 3) << 11) | (g >> 2) << 5 | (b >> 3) )
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
-
-#include <mach/lge_diag_mtc.h>
 
 /*
  * EXTERNAL FUNCTION AND VARIABLE DEFINITIONS
  */
 extern PACK(void *) diagpkt_alloc(diagpkt_cmd_code_type code,unsigned int length);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 extern PACK(void *) diagpkt_alloc2 (diagpkt_cmd_code_type code, unsigned int length, unsigned int packet_length);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 extern PACK(void *) diagpkt_free(PACK(void *)pkt);
 
 extern void icd_send_to_arm9(void* pReq, void* pRsp, unsigned int output_length);
 
 extern icd_user_table_entry_type icd_mstr_tbl[ICD_MSTR_TBL_SIZE];
 
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 unsigned char g_diag_slate_capture_rsp_num = 0;
 unsigned char g_slate_status = 0x0;//Slate_ADB
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 extern int lge_bd_rev;
-
-extern unsigned char lge_img_capture_32bpp[MTC_SCRN_BUF_32BPP_SIZE];
-extern unsigned char lge_img_capture_16bpp[MTC_SCRN_BUF_SIZE_MAX];
 
 /*
  * LOCAL DEFINITIONS AND DECLARATIONS FOR MODULE
@@ -103,10 +92,8 @@ PACK(void *) LGE_ICDProcess(PACK(void *)req_pkt_ptr,	/* pointer to request packe
 	unsigned int rsp_ptr_len;
 
 	int nIndex = 0;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	if(!g_slate_status)//Slate_ADB
 		g_slate_status = 0x1;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 	diagpdev = diagcmd_get_dev();
 
@@ -130,12 +117,10 @@ PACK(void *) LGE_ICDProcess(PACK(void *)req_pkt_ptr,	/* pointer to request packe
 			continue;
 		}
 	}
-	
-	sys_chmod("/data/img", 0664); // change directory permission to make adb commands non-available on "data/img", prevent rooting
 
 	if (func_ptr != NULL) 
 	{
-		printk(KERN_INFO "[ICD] cmd_code : [0x%X], sub_cmd : [0x%X]\n",req_ptr->hdr.cmd_code, req_ptr->hdr.sub_cmd);
+//		printk(KERN_INFO "[ICD] cmd_code : [0x%X], sub_cmd : [0x%X]\n",req_ptr->hdr.cmd_code, req_ptr->hdr.sub_cmd);
 		rsp_ptr = func_ptr((DIAG_ICD_F_req_type *) req_ptr);
 	} 
 	else
@@ -159,16 +144,12 @@ PACK(void *) LGE_ICDProcess(PACK(void *)req_pkt_ptr,	/* pointer to request packe
 			case ICD_GETBATTERYCHARGINGSTATE_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_set_battery_charging_state_rsp_type);
 				break;
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL [s]				
-//			case ICD_GETBATTERYLEVEL_REQ_CMD:
-//				rsp_ptr_len = sizeof(icd_get_battery_level_rsp_type);
-//				break;
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL [e]				
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [s] 
-//			case ICD_GETRSSI_REQ_CMD:
-//				rsp_ptr_len = sizeof(icd_get_rssi_rsp_type);
-//				break;
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [e]					
+			case ICD_GETBATTERYLEVEL_REQ_CMD:
+				rsp_ptr_len = sizeof(icd_get_battery_level_rsp_type);
+				break;
+			case ICD_GETRSSI_REQ_CMD:
+				rsp_ptr_len = sizeof(icd_get_rssi_rsp_type);
+				break;
 			case ICD_SETDISCHARGING_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_set_discharger_rsp_type);
 				break;
@@ -186,17 +167,15 @@ PACK(void *) LGE_ICDProcess(PACK(void *)req_pkt_ptr,	/* pointer to request packe
 			case ICD_GETSCREENLOCKSTATUS_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_get_screenlock_status_rsp_type);				
 				break;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 			case ICD_SETSCREENLOCKSTATUS_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_set_screenlock_status_rsp_type);				
 				break;
 			case ICD_SETSCREENORIENTATIONLOCK_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_set_screenorientationlock_rsp_type);
 				break;
-			case ICD_GETANDROIDIDENTIFIER_REQ_CMD:
+			case ICD_GETANDORIDIDENTIFIER_REQ_CMD:
 				rsp_ptr_len = sizeof(icd_get_android_identifier_rsp_type);				
 				break;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 			default:
 				is_valid_arm9_command = 0;
 				printk(KERN_INFO "[ICD] %s : invalid sub command : 0x%x\n",__func__,req_ptr->hdr.sub_cmd);
@@ -233,7 +212,7 @@ DIAG_ICD_F_rsp_type *icd_info_req_proc(DIAG_ICD_F_req_type * pReq)
 
 	rsp_len = sizeof(icd_device_info_rsp_type);
 
-	printk(KERN_INFO "[ICD] icd_info_req_proc\n");
+	printk(KERN_INFO "[ICD] get icd_info_req_proc req \n");
 	printk(KERN_INFO "[ICD] icd_info_req_proc rsp_len :(%d)\n", rsp_len);
 
 	pRsp = (DIAG_ICD_F_rsp_type *) diagpkt_alloc(DIAG_ICD_F, rsp_len);
@@ -281,9 +260,7 @@ DIAG_ICD_F_rsp_type *icd_extended_info_req_proc(DIAG_ICD_F_req_type * pReq)
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_GETEXTENDEDVERSION", 1);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(100);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
 			strcpy(pRsp->icd_rsp.extended_rsp_info.ver_string,process_value);
@@ -326,7 +303,165 @@ DIAG_ICD_F_rsp_type *icd_handset_disp_text_req_proc(DIAG_ICD_F_req_type * pReq)
 	
 	return pRsp;
 }
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
+#if 0
+static void add_hdlc_packet(struct slate_data_buffer *mb, char data)
+{
+	mb->data[mb->data_length++] = data;
+
+	if (mb->data_length >= BUFFER_MAX_SIZE) {
+		mb->data_length = BUFFER_MAX_SIZE;
+		msleep(10);
+		if (diagchar_ioctl (DIAG_IOCTL_BULK_DATA, (unsigned long)mb)) {
+			printk(KERN_ERR "[SLATE] %s: diagchar_ioctl error\n", __func__);
+		} 
+		mb->data_length = 0;
+	}
+
+	return;
+}
+/*
+ * FUNCTION	add_hdlc_esc_packet.
+ */
+static void add_hdlc_esc_packet(struct slate_data_buffer *mb, char data)
+{
+	if (data == ESC_CHAR || data == CONTROL_CHAR) {
+		add_hdlc_packet(mb, ESC_CHAR);
+		add_hdlc_packet(mb, (data ^ ESC_MASK));
+	} 
+	else {
+		add_hdlc_packet(mb, data);
+	}
+
+	return;
+}
+
+/*
+ * FUNCTION	mtc_send_hdlc_packet.
+ */
+static void slate_send_hdlc_packet(byte * pBuf, int len)
+{
+	int i;
+	struct slate_data_buffer *mb = NULL;
+	word crc = CRC_16_L_SEED;
+
+	mb = (struct slate_data_buffer *)kzalloc(sizeof(struct slate_data_buffer), GFP_KERNEL);
+	if (mb == NULL) {
+		printk(KERN_ERR "[SLATE] %s: failed to alloc memory\n", __func__);
+		return;
+	}
+
+	//Generate crc data.
+	for (i = 0; i < len; i++) {
+		add_hdlc_esc_packet(mb, pBuf[i]);
+		crc = CRC_16_L_STEP(crc, (word) pBuf[i]);
+	}
+
+	crc ^= CRC_16_L_SEED;
+	add_hdlc_esc_packet(mb, ((unsigned char)crc));
+	add_hdlc_esc_packet(mb, ((unsigned char)((crc >> 8) & 0xFF)));
+	add_hdlc_packet(mb, CONTROL_CHAR);
+
+	if (diagchar_ioctl(DIAG_IOCTL_BULK_DATA, (unsigned long)mb)) {
+		printk(KERN_ERR "[SLATE] %s: ioctl ignored\n", __func__);
+	}
+
+	if(mb != NULL)
+	{
+		printk(KERN_INFO "%s(), slate_data_buffer free\n",__func__);
+		kfree(mb);
+		mb = NULL;
+	}
+
+	return;
+}
+
+void slate_send_key_log_packet(unsigned long keycode, unsigned long state)
+{
+	key_msg_type msg;
+	dword sendKeyValue = 0;
+
+	if(mtc_running)
+		return ;
+
+	memset(&msg, 0, sizeof(key_msg_type));
+
+	sendKeyValue = keycode;
+
+	msg.cmd_code = 121;
+	msg.ts_type = 0;	//2;
+	msg.num_args = 2;
+	msg.drop_cnt = 0;
+	//ts_get(&msg.time[0]); 
+	msg.time[0] = 0;
+	msg.time[1] = 0;
+	msg.line_number = 261;
+	msg.ss_id = LGE_DIAG_ICD_LOGGING_SSID;
+	msg.ss_mask = LGE_DIAG_ICD_LOGGING_SSID_MASK;
+	msg.args[0] = sendKeyValue;
+	msg.args[1] = state;
+
+	printk(KERN_INFO "%s(), sendKeyValue:%ld, state:%ld \n",__func__,sendKeyValue,state);
+
+	memcpy(&msg.code[0], "Debounced %d", sizeof("Debounced %d"));
+	//msg.code[12] = '\0';
+
+	memcpy(&msg.file_name[0], "ckpd_daemon.c", sizeof("ckpd_daemon.c"));
+	//msg.fle_name[13] = '\0';
+
+	slate_send_hdlc_packet((byte *) & msg, sizeof(key_msg_type));
+
+	return;
+}
+EXPORT_SYMBOL(slate_send_key_log_packet);
+#endif
+#if 0
+void slate_send_touch_log_packet(unsigned long touch_x, unsigned long touch_y, unsigned long status)
+{
+	touch_msg_type msg;
+	
+	/* LGE_CHANGE [dojip.kim@lge.com] 2010-06-04 [LS670]
+	 * don't send a raw diag packet in running MTC
+	 */
+	if(mtc_running)
+		return ;
+	memset(&msg, 0, sizeof(touch_msg_type));
+
+	msg.cmd_code = 121;
+	msg.ts_type = 0;	//2;
+	msg.num_args = 3;
+	msg.drop_cnt = 0;
+	//ts_get(&msg.time[0]); 
+	msg.time[0] = 0;
+	msg.time[1] = 0;
+	msg.line_number = 261;
+	msg.ss_id = LGE_DIAG_ICD_LOGGING_SSID;
+	msg.ss_mask = LGE_DIAG_ICD_LOGGING_SSID_MASK;
+	printk(KERN_INFO "%s(), status:%ld\n",__func__, status);
+	if(status == 1) // push - "DWN"
+	{
+		printk(KERN_INFO "%s(), Down\n",__func__);
+		msg.args[0] = 0x004E5744;
+	}
+	else	// release - "UP"
+	{
+		printk(KERN_INFO "%s(), Up\n",__func__);		
+		msg.args[0] = 0x00005055;
+	}
+	msg.args[1] = touch_x*480/max_x;
+	msg.args[2] = touch_y*800/max_y;
+	printk(KERN_INFO "%s(), touch_x:%ld, touch_y:%ld\n",__func__,touch_x,touch_y);
+	memcpy(&msg.code[0], "PenEvent %d,%d", sizeof("PenEvent %d,%d"));
+	//msg.code[12] = '\0';
+
+	memcpy(&msg.file_name[0], "ckpd_daemon.c", sizeof("ckpd_daemon.c"));
+	//msg.fle_name[13] = '\0';
+
+	slate_send_hdlc_packet((byte *) & msg, sizeof(touch_msg_type));
+	
+	return;
+}
+EXPORT_SYMBOL(slate_send_touch_log_packet);
+#endif
 typedef struct
 {
 	short 	bfType;
@@ -388,31 +523,30 @@ int removefile( char const *filename )
 }
 EXPORT_SYMBOL(removefile);
 
-// careful of slate_screencap, added -s for slate capture and the path
-int makepix(void)
+int makepix()
 {
              char *argv[4] = { NULL, NULL, NULL, NULL };
              char *envp[3] = { NULL, NULL, NULL };
  
              argv[0] = "/system/bin/slate_screencap";
-			 argv[1] = "-s";
-			 argv[2] = "/data/img/img.raw";
  
              envp[0] = "HOME=/";
              envp[1] = "TERM=linux";
 
              return call_usermodehelper( argv[0], argv, envp, UMH_WAIT_PROC );
 }
-
-static byte save_buffer[LCD_BUFFER_SIZE];
-
+#if 1
 static void read_Framebuffer(int x_start, int y_start, int x_end, int y_end)
 {
-	//byte *fb_buffer;
-	//byte *save_buffer;
-
-	int fbfd, i, j;
+	struct file *phMscd_Filp = NULL;
+	struct fb_var_screeninfo fb_varinfo;
+	byte *fb_buffer;
+	byte *save_buffer;
+	int fbfd, dst_cnt, i, j;
+	unsigned short rgbValue;
+	unsigned int rsp_len, packet_len;	
 	mm_segment_t old_fs=get_fs();
+	byte tmp = 0x0;
 	int point = 0;
 	BITMAPFILEHEADER map_header;
 	BITMAPINFOHEADER info_header;
@@ -420,10 +554,21 @@ static void read_Framebuffer(int x_start, int y_start, int x_end, int y_end)
 
 	set_fs(get_ds());
 	
-	//fb_buffer = vmalloc(LCD_BUFFER_SIZE);
-	memset(lge_img_capture_32bpp, 0x00, sizeof(lge_img_capture_32bpp));
+	fb_buffer = vmalloc(LCD_BUFFER_SIZE);
+	memset(fb_buffer, 0x00, LCD_BUFFER_SIZE);
 
 	makepix();
+#if 0	
+	phMscd_Filp = filp_open("/dev/graphics/fb0", O_RDONLY |O_LARGEFILE, 0);
+
+	if( !phMscd_Filp) {
+		printk("open fail screen capture \n" );
+		return;
+	}
+
+	phMscd_Filp->f_op->read(phMscd_Filp, fb_buffer, LCD_BUFFER_SIZE, &phMscd_Filp->f_pos);
+	filp_close(phMscd_Filp,NULL);
+#endif
 
 	if( (fbfd = sys_open("/data/img/img.raw", O_RDONLY, 0)) == -1 )
 	{
@@ -431,19 +576,19 @@ static void read_Framebuffer(int x_start, int y_start, int x_end, int y_end)
 		return;
 	}
 	
-	sys_read(fbfd, lge_img_capture_32bpp, sizeof(lge_img_capture_32bpp)) ;
+	sys_read(fbfd, fb_buffer, LCD_BUFFER_SIZE) ;
 
 	sys_close(fbfd);
 
 	removefile("/data/img/img.raw");
 	
-	if( (fbfd = sys_open("/data/img/image.bmp", O_CREAT | O_LARGEFILE | O_WRONLY, 0)) < 0)
+	if( (fbfd = sys_open("/data/img/image.bmp", O_CREAT | O_LARGEFILE | O_WRONLY, 0)) == -1)
 	{
 		printk(KERN_ERR "%s, Can't open %s\n",__func__,"/data/img/image.bmp");
 		return;
 	}
 	
-	//save_buffer = vmalloc(LCD_BUFFER_SIZE);	
+	save_buffer = vmalloc(LCD_BUFFER_SIZE);	
 	memset(save_buffer, 0x00, LCD_BUFFER_SIZE);
 
 	for(j=0;j<LCD_MAIN_HEIGHT;j++)
@@ -452,7 +597,7 @@ static void read_Framebuffer(int x_start, int y_start, int x_end, int y_end)
 		{
 			if(((i>=(x_start)) && (i<(x_end+1))) && ((j>=(y_start)) && (j<(y_end+1))))
 			{
-				memcpy(&save_buffer[point], &lge_img_capture_32bpp[(j*LCD_MAIN_WIDTH*4)+i*4], sizeof(byte) * 4);
+				memcpy(&save_buffer[point], &fb_buffer[(j*LCD_MAIN_WIDTH*4)+i*4], sizeof(byte) * 4);
 				point += 4;
 			}
 		}
@@ -476,71 +621,96 @@ static void read_Framebuffer(int x_start, int y_start, int x_end, int y_end)
 	info_header.biYPelsPerMeter = 0xec4;
 	info_header.biClrUsed = 0x0;
 	info_header.biClrImportant = 0x0;
-#if 0	
+
 	printk(KERN_INFO "%s(), sizeof(BITMAPFILEHEADER):%d\n",__func__,sizeof(BITMAPFILEHEADER));
-	printk(KERN_INFO "%s(), map_header.bfType:0x%X\n", __func__,(int)map_header.bfType);
-	printk(KERN_INFO "%s(), map_header.bfSize:0x%lX\n", __func__,map_header.bfSize);	
-	printk(KERN_INFO "%s(), map_header.bfReserved1:0x%X\n", __func__,(int)map_header.bfReserved1);	
-	printk(KERN_INFO "%s(), map_header.bfReserved2:0x%X\n", __func__,(int)map_header.bfReserved2);
-	printk(KERN_INFO "%s(), map_header.bfOffBits:0x%lX\n", __func__,map_header.bfOffBits);
+	printk(KERN_INFO "%s(), map_header.bfType:0x%x\n", __func__,map_header.bfType);
+	printk(KERN_INFO "%s(), map_header.bfSize:0x%x\n", __func__,map_header.bfSize);	
+	printk(KERN_INFO "%s(), map_header.bfReserved1:0x%x\n", __func__,map_header.bfReserved1);	
+	printk(KERN_INFO "%s(), map_header.bfReserved2:0x%x\n", __func__,map_header.bfReserved2);
+	printk(KERN_INFO "%s(), map_header.bfOffBits:0x%x\n", __func__,map_header.bfOffBits);
 	
 	printk(KERN_INFO "%s(), sizeof(BITMAPINFOHEADER):%d\n",__func__,sizeof(BITMAPINFOHEADER));
-	printk(KERN_INFO "%s(), info_header.biSize:0x%lX \n",__func__,info_header.biSize);
-	printk(KERN_INFO "%s(), info_header.biWidth:0x%lX\n",__func__,info_header.biWidth);
-	printk(KERN_INFO "%s(), info_header.biHeight:0x%lX\n",__func__,info_header.biHeight);
-	printk(KERN_INFO "%s(), info_header.biPlanes:0x%X\n",__func__,(int)info_header.biPlanes);
-	printk(KERN_INFO "%s(), info_header.biBitCount:0x%X\n",__func__,(int)info_header.biBitCount);
-	printk(KERN_INFO "%s(), info_header.biCompression:0x%lX\n",__func__,info_header.biCompression);
-	printk(KERN_INFO "%s(), info_header.biSizeImage:0x%lX\n",__func__,info_header.biSizeImage);
-	printk(KERN_INFO "%s(), info_header.biXPelsPerMeter:0x%lX\n",__func__,info_header.biXPelsPerMeter);
-	printk(KERN_INFO "%s(), info_header.biYPelsPerMeter:0x%lX\n",__func__,info_header.biYPelsPerMeter);
-	printk(KERN_INFO "%s(), info_header.biClrUsed:0x%lX\n",__func__,info_header.biClrUsed);
-	printk(KERN_INFO "%s(), info_header.biClrImportant:0x%lX\n",__func__,info_header.biClrImportant);
-#endif
+	printk(KERN_INFO "%s(), info_header.biSize:0x%x \n",__func__,info_header.biSize);
+	printk(KERN_INFO "%s(), info_header.biWidth:0x%x\n",__func__,info_header.biWidth);
+	printk(KERN_INFO "%s(), info_header.biHeight:0x%x\n",__func__,info_header.biHeight);
+	printk(KERN_INFO "%s(), info_header.biPlanes:0x%x\n",__func__,info_header.biPlanes);
+	printk(KERN_INFO "%s(), info_header.biBitCount:0x%x\n",__func__,info_header.biBitCount);
+	printk(KERN_INFO "%s(), info_header.biCompression:0x%x\n",__func__,info_header.biCompression);
+	printk(KERN_INFO "%s(), info_header.biSizeImage:0x%x\n",__func__,info_header.biSizeImage);
+	printk(KERN_INFO "%s(), info_header.biXPelsPerMeter:0x%x\n",__func__,info_header.biXPelsPerMeter);
+	printk(KERN_INFO "%s(), info_header.biYPelsPerMeter:0x%x\n",__func__,info_header.biYPelsPerMeter);
+	printk(KERN_INFO "%s(), info_header.biClrUsed:0x%x\n",__func__,info_header.biClrUsed);
+	printk(KERN_INFO "%s(), info_header.biClrImportant:0x%x\n",__func__,info_header.biClrImportant);
 
-	sys_write(fbfd, (const char __user *)&map_header, sizeof(BITMAPFILEHEADER));
-	sys_write(fbfd, (const char __user *)&info_header, sizeof(BITMAPINFOHEADER));
-	sys_write(fbfd, (const char __user *)&header, sizeof(byte)*12);
+	sys_write(fbfd, &map_header, sizeof(BITMAPFILEHEADER));
+	sys_write(fbfd, &info_header, sizeof(BITMAPINFOHEADER));
+	sys_write(fbfd, &header, sizeof(byte)*12);
 	
 	sys_write(fbfd, save_buffer, point);
 	sys_close(fbfd);
 	
 	set_fs(old_fs);	
 
-	//if(save_buffer != NULL)
-	//	vfree(save_buffer);
+	if(save_buffer != NULL)
+		vfree(save_buffer);
 	
-	//if(fb_buffer != NULL)
-	//	vfree(fb_buffer);
-	
+	if(fb_buffer != NULL)
+		vfree(fb_buffer);
 }
 
-#ifdef CONFIG_LGE_DIAG_TESTMODE //2012.05.14 yunjeong.kang Testmode 250-116-6
-int read_Framebuffer_Testmode(char *path, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
+#else
+void read_Framebuffer(byte* pBuf)
 {
-    char *argv[4] = { NULL, NULL, NULL, NULL };
-    char *envp[3] = { NULL, NULL, NULL };
-    char buf[20] = {0,};
-	int ret = -1;
+	struct file *phMscd_Filp = NULL;
+	struct fb_var_screeninfo fb_varinfo;
+	byte *fb_buffer;
+	int fbfd, dst_cnt, i, j;
+	unsigned short rgbValue;
+	unsigned int rsp_len, packet_len;	
+	mm_segment_t old_fs=get_fs();
+	
+	//printk("[%s] start\n",__func__);
+	
+	set_fs(get_ds());
+	
+	fb_buffer = vmalloc(LCD_BUFFER_SIZE);
+	
+	phMscd_Filp = filp_open("/dev/graphics/fb0", O_RDONLY |O_LARGEFILE, 0);
 
-    /* use modified screencap */
-    argv[0] = "/system/bin/screencap";
-    sprintf(buf, "-c %dx%d+%d+%d", x, y, w, h);
-    argv[1] = buf;
-	if(path == NULL)
-	    argv[2] = "/data/img/mft_lcd_img";
-	else
-		argv[2] = path;
+	if( !phMscd_Filp) {
+		printk("open fail screen capture \n" );
+		return;
+	}
 
-    envp[0] = "HOME=/";
-    envp[1] = "TERM=linux";
+	phMscd_Filp->f_op->read(phMscd_Filp, fb_buffer, LCD_BUFFER_SIZE, &phMscd_Filp->f_pos);
+	filp_close(phMscd_Filp,NULL);
 
-    ret = call_usermodehelper( argv[0], argv, envp, UMH_WAIT_PROC );
-    return ret;
-}
-EXPORT_SYMBOL(read_Framebuffer_Testmode);
+
+//converting ARGB8888 -> RGB565 for UTS
+	for(i = 0,j = 0; i < LCD_BUFFER_SIZE; i+=4)
+	{
+		  rgbValue = CONVERT565(fb_buffer[i],fb_buffer[i+1],fb_buffer[i+2]);
+		  pBuf[j++] = (byte)(rgbValue & 0x00FF);
+		  pBuf[j++] = (byte)((rgbValue & 0xFF00) >> 8);
+	}
+#if 0
+	if( (fbfd = sys_open("/data/image.txt", O_CREAT | O_LARGEFILE | O_WRONLY, 0)) == -1)
+	{
+		printk(KERN_ERR "%s, Can't open %s\n",__func__,"/data/image.txt");
+		return;
+	}
+
+	sys_write(fbfd, pBuf, j);
+
+ 	sys_close(fbfd);
 #endif
+	
+	set_fs(old_fs);	
+	//printk("[%s] end\n",__func__);
 
+	vfree(fb_buffer);
+}
+#endif
 #define CPU_PERFORMANCE_PATH 		"/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 #define ONDEMAND 			0
 #define PERFORMANCE 		1
@@ -549,10 +719,11 @@ int write_cpu_performanc(char * path, int on)
 	int write;
 	int err;
 	char str[20];
-	mm_segment_t oldfs=get_fs();
 
 	memset(str, 0x0, sizeof(char) * 20);
+	mm_segment_t oldfs;
 
+	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
 	write = sys_open((const char __user *) path, O_WRONLY | O_CREAT | O_TRUNC , 0);
@@ -582,18 +753,17 @@ int write_cpu_performanc(char * path, int on)
 	}
 	sys_close(write);
 	set_fs(oldfs);	
-	return -1;
 }
-
 EXPORT_SYMBOL(write_cpu_performanc);
 
 int read_cpu_performanc(const char *path)
 {
-	int read;
+	int read,i;
 	int read_size;
 	char buf[20];
-	mm_segment_t oldfs=get_fs();
+	mm_segment_t oldfs;
 	
+	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
 	read = sys_open((const char __user *)path, O_RDONLY , 0);
@@ -633,13 +803,188 @@ int read_cpu_performanc(const char *path)
 	return -1;
 }
 EXPORT_SYMBOL(read_cpu_performanc);
+#if 0
+byte* send_buf = NULL;
+byte* temp_img_block = NULL;
+extern unsigned char g_diag_mtc_capture_rsp_num;
+DIAG_ICD_F_rsp_type *icd_capture_img_req_proc(DIAG_ICD_F_req_type * pReq)
+{
+	unsigned int rsp_len, packet_len;	
+	static short x_start=0, y_start=0, x_end=0, y_end=0;
+	int i, j;	
+	static int total_bytes = 0, send_bytes = 0, remain_bytes = 0;
+	static short seq_num = 0;
+	ssize_t bmp_size;
+	DIAG_ICD_F_rsp_type *pRsp;	
+
+	g_diag_mtc_capture_rsp_num = 0x01;
+
+	if(pReq->icd_req.capture_req_info.seq_num == 0)
+	{
+		x_start = pReq->icd_req.capture_req_info.upper_left_x;
+		y_start = pReq->icd_req.capture_req_info.upper_left_y;
+		x_end = pReq->icd_req.capture_req_info.lower_right_x;
+		y_end = pReq->icd_req.capture_req_info.lower_right_y;
+		seq_num = pReq->icd_req.capture_req_info.seq_num;		
+	}
+	
+	rsp_len = sizeof(icd_screen_capture_rsp_type);
+	packet_len = rsp_len;
+
+//	printk(KERN_INFO "%s(), x_start:%d, y_start:%d, x_end:%d, y_end:%d, seq_num:%d \n",
+//		__func__,x_start ,y_start ,x_end ,y_end , seq_num);
+
+	pRsp = (DIAG_ICD_F_rsp_type *)diagpkt_alloc2(DIAG_ICD_F, rsp_len, packet_len);
+  	if (pRsp == NULL) {
+		printk(KERN_ERR "[ICD] diagpkt_alloc failed\n");
+		return NULL;
+  	}
+	memset(pRsp, 0, rsp_len);
+
+	if(pReq->icd_req.capture_req_info.seq_num == 0)
+	{
+		total_bytes= 0;
+		send_bytes = 0;
+		remain_bytes = 0;
+		seq_num = 0;
+		
+		if(temp_img_block == NULL)
+			temp_img_block = vmalloc(sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4);
+		else
+		{
+			printk(KERN_ERR "%s(), temp_img_block isn't NULL, need to free\n",__func__);
+			vfree(temp_img_block);
+			temp_img_block = NULL;
+			temp_img_block = vmalloc(sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4);
+
+		}
+
+		if(send_buf == NULL)
+			send_buf = vmalloc(sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 3);
+		else
+		{
+			printk(KERN_ERR "%s(), send_buf isn't NULL, need to free\n",__func__);
+			vfree(send_buf);
+			send_buf = NULL;
+			send_buf = vmalloc(sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 3);
+		}
+
+		memset(temp_img_block, 0x0, sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4);
+		memset(send_buf, 0x0, sizeof(byte) * LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 3);
+
+		read_Framebuffer(temp_img_block);
+
+		
+		if((x_start == 0) && (x_end == 319) && (y_start == 0) && (y_end == 479) ) //lcd size hard coding 
+		{
+			//printk(KERN_INFO "%s(), Full Capture\n",__func__);
+			for(j=0;j<LCD_MAIN_HEIGHT;j++)
+			{
+				for(i=0;i<LCD_MAIN_WIDTH*2;i++)
+				{
+					if(((i>=x_start*2) && (i<(x_end)*2)) && ((j>=(y_start)) && (j<(y_end))))
+					{
+						send_buf[total_bytes++] = (byte)temp_img_block[(j*LCD_MAIN_WIDTH*2)+i];
+					}
+				}
+			}
+		}
+		else
+		{
+			//printk(KERN_INFO "%s(), Cropperd Capture\n",__func__);			
+			for(j=0;j<LCD_MAIN_HEIGHT;j++)
+			{
+				for(i=0;i<LCD_MAIN_WIDTH*2;i++)
+				{
+					if(((i>=x_start*2) && (i<(x_end+1)*2)) && ((j>=(y_start)) && (j<(y_end+1))))
+					{
+						send_buf[total_bytes++] = (byte)temp_img_block[(j*LCD_MAIN_WIDTH*2)+i];
+					}
+				}
+			}
+		}
+		vfree(temp_img_block);
+		temp_img_block = NULL;
+		remain_bytes = total_bytes;
+	}
+	//printk(KERN_INFO "%s(), total_bytes:%d\n",__func__,total_bytes);
+
+
+	if(remain_bytes <= ICD_SEND_BUF_SIZE)
+	{
+		pRsp->icd_rsp.capture_rsp_info.flags = LastImageNoHeader;
+		memset(pRsp->icd_rsp.capture_rsp_info.image_data_block, 0x0, ICD_SEND_BUF_SIZE);
+		memcpy(pRsp->icd_rsp.capture_rsp_info.image_data_block, &send_buf[send_bytes], ICD_SEND_BUF_SIZE);
+		//printk(KERN_INFO "%s(), total_bytes:%d, send_bytes:%d, remain_bytes:%d\n",__func__,total_bytes, send_bytes, remain_bytes);
+		send_bytes = 0;
+		remain_bytes = 0;
+		
+	}
+	else
+	{
+		pRsp->icd_rsp.capture_rsp_info.flags = ContinueImageNoHeader;
+		memset(pRsp->icd_rsp.capture_rsp_info.image_data_block, 0x0, ICD_SEND_BUF_SIZE);
+		memcpy(pRsp->icd_rsp.capture_rsp_info.image_data_block, &send_buf[send_bytes], ICD_SEND_BUF_SIZE);
+
+		send_bytes += ICD_SEND_BUF_SIZE;
+		remain_bytes = total_bytes - send_bytes;
+		//printk(KERN_INFO "%s(), total_bytes:%d, send_bytes:%d, remain_bytes:%d\n",__func__,total_bytes, send_bytes, remain_bytes);
+	}
+
+	pRsp->hdr.cmd_code = DIAG_ICD_F;
+	pRsp->hdr.sub_cmd = ICD_CAPTUREIMAGE_REQ_CMD;
+	pRsp->icd_rsp.capture_rsp_info.screen_id = 0;
+	pRsp->icd_rsp.capture_rsp_info.upper_left_x = x_start;
+	pRsp->icd_rsp.capture_rsp_info.upper_left_y = y_start;		
+	pRsp->icd_rsp.capture_rsp_info.lower_right_x = x_end;
+	pRsp->icd_rsp.capture_rsp_info.lower_right_y = y_end;
+	pRsp->icd_rsp.capture_rsp_info.bit_per_pixel = 16;
+	pRsp->icd_rsp.capture_rsp_info.actual_width = x_end - x_start;
+	pRsp->icd_rsp.capture_rsp_info.actual_height = y_end - y_start;
+	pRsp->icd_rsp.capture_rsp_info.seq_num = seq_num++;
+#if 0
+	printk(KERN_INFO "%s(),cmd_code:0x%x sub_cmd:0x%x screen_id:0x%x upper_left_x:0x%x upper_left_y:0x%x lower_right_x:0x%x lower_right_y:0x%x bit_per_pixel:0x%x actual_width:0x%x actual_height:0x%x seq_num:0x%x\n",
+							__func__, pRsp->hdr.cmd_code,pRsp->hdr.sub_cmd,pRsp->icd_rsp.capture_rsp_info.screen_id,
+							pRsp->icd_rsp.capture_rsp_info.actual_width,pRsp->icd_rsp.capture_rsp_info.actual_height,
+							pRsp->icd_rsp.capture_rsp_info.upper_left_x,pRsp->icd_rsp.capture_rsp_info.upper_left_y,
+							pRsp->icd_rsp.capture_rsp_info.lower_right_x,pRsp->icd_rsp.capture_rsp_info.lower_right_y,
+							pRsp->icd_rsp.capture_rsp_info.flags,pRsp->icd_rsp.capture_rsp_info.bit_per_pixel);
+
+
+	printk(KERN_INFO "%s(),0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+							__func__, pRsp->hdr.cmd_code,pRsp->hdr.sub_cmd,pRsp->icd_rsp.capture_rsp_info.screen_id,
+							pRsp->icd_rsp.capture_rsp_info.actual_width,pRsp->icd_rsp.capture_rsp_info.actual_height,
+							pRsp->icd_rsp.capture_rsp_info.upper_left_x,pRsp->icd_rsp.capture_rsp_info.upper_left_y,
+							pRsp->icd_rsp.capture_rsp_info.lower_right_x,pRsp->icd_rsp.capture_rsp_info.lower_right_y,
+							pRsp->icd_rsp.capture_rsp_info.flags,pRsp->icd_rsp.capture_rsp_info.bit_per_pixel);
+#endif
+
+	if(remain_bytes == 0)
+	{
+		//printk(KERN_INFO "%s(), reset total_bytes, send_bytes, remain_bytes, seq_num, send_buf\n",__func__);
+		total_bytes= 0;
+		send_bytes = 0;
+		remain_bytes = 0;
+		seq_num = 0;
+		vfree(send_buf);
+		send_buf = NULL;
+	}
+
+	return pRsp;
+}
+
+#else
 
 DIAG_ICD_F_rsp_type *icd_capture_img_req_proc(DIAG_ICD_F_req_type * pReq)
 {
 	unsigned int rsp_len, packet_len;	
 	static short x_start=0, y_start=0, x_end=0, y_end=0;
+	int i, j;
+	static int total_bytes = 0, send_bytes = 0, remain_bytes = 0;
 	static short seq_num = 0;
+	ssize_t bmp_size;
 	DIAG_ICD_F_rsp_type *pRsp;	
+	byte* save_buf;
 
 	g_diag_slate_capture_rsp_num = 0x01;
 
@@ -650,6 +995,13 @@ DIAG_ICD_F_rsp_type *icd_capture_img_req_proc(DIAG_ICD_F_req_type * pReq)
 		x_end = pReq->icd_req.capture_req_info.lower_right_x;
 		y_end = pReq->icd_req.capture_req_info.lower_right_y;
 		seq_num = pReq->icd_req.capture_req_info.seq_num;
+#if 0
+		i = read_cpu_performanc(CPU_PERFORMANCE_PATH);
+		if(!i)
+			i = write_cpu_performanc(CPU_PERFORMANCE_PATH, 1);
+		else if(i < 0)
+			i = write_cpu_performanc(CPU_PERFORMANCE_PATH, 1);
+#endif		
 	}
 	
 	rsp_len = sizeof(icd_screen_capture_rsp_type);
@@ -686,13 +1038,12 @@ DIAG_ICD_F_rsp_type *icd_capture_img_req_proc(DIAG_ICD_F_req_type * pReq)
 	memset(pRsp->icd_rsp.capture_rsp_info.image_data_block, 0x0, sizeof(char) * ICD_SEND_SAVE_IMG_PATH_LEN);
 	sprintf(pRsp->icd_rsp.capture_rsp_info.image_data_block, "/data/img/image.bmp");
 
-    sys_chmod("/data/img", 0755); // change directory permission to make adb commands available on "data/img"
-	sys_chmod("/data/img/image.bmp", 0644);
+	sys_chmod("/data/img/image.bmp", 0666);
 
 	return pRsp;
 }
-/** SAR : Sprint Automation Requirement - END **/
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
+
+#endif
 
 /** ICDR : ICD Implementation Recommendation  - START **/
 DIAG_ICD_F_rsp_type *icd_get_airplanemode_req_proc(DIAG_ICD_F_req_type * pReq)
@@ -719,9 +1070,7 @@ DIAG_ICD_F_rsp_type *icd_get_airplanemode_req_proc(DIAG_ICD_F_req_type * pReq)
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_GETAIRPLANEMODE", 1);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(100);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
 			if(strcmp(process_value,"GETAIRPLANE_0") == 0)
@@ -779,9 +1128,7 @@ DIAG_ICD_F_rsp_type *icd_set_airplanemode_req_proc(DIAG_ICD_F_req_type * pReq)
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_SETAIRPLANEMODE", pReq->icd_req.set_aiplane_mode_req_info.airplane_mode);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(300);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
@@ -840,9 +1187,7 @@ DIAG_ICD_F_rsp_type *icd_get_backlight_setting_req_proc(DIAG_ICD_F_req_type * pR
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_GETBACKLIGHTSETTING", 1);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(100);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
@@ -906,9 +1251,7 @@ DIAG_ICD_F_rsp_type *icd_set_backlight_setting_req_proc(DIAG_ICD_F_req_type * pR
 {
 	unsigned int rsp_len;
 	DIAG_ICD_F_rsp_type *pRsp;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
-	int retry_num = 0;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
+	int retry_num;
 	
 	rsp_len = sizeof(icd_set_backlight_setting_rsp_type);
 	
@@ -929,7 +1272,6 @@ DIAG_ICD_F_rsp_type *icd_set_backlight_setting_req_proc(DIAG_ICD_F_req_type * pR
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_SETBACKLIGHTSETTING", pReq->icd_req.set_backlight_setting_req_info.item_data);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(200);
 
 		while(strcmp(process_status,"START") == 0)
@@ -941,7 +1283,6 @@ DIAG_ICD_F_rsp_type *icd_set_backlight_setting_req_proc(DIAG_ICD_F_req_type * pR
 			if(retry_num==3)	
 				break;
 		}
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 		
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
@@ -1027,15 +1368,12 @@ DIAG_ICD_F_rsp_type *icd_set_batterycharging_state_req_proc(DIAG_ICD_F_req_type 
 DIAG_ICD_F_rsp_type *icd_get_battery_level_req_proc(DIAG_ICD_F_req_type * pReq)
 {
 	unsigned int rsp_len;
-	unsigned int crc_val =0;
 	DIAG_ICD_F_rsp_type *pRsp;
 	
 	rsp_len = sizeof(icd_get_battery_level_rsp_type);
 	
-	printk(KERN_INFO "[ICD] icd_get_batterylevel_req_proc req \n");
-	printk(KERN_INFO "[ICD] icd_info_req_proc rsp_len :(%d)\n", rsp_len);
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL 
-
+	printk(KERN_INFO "[ICD] icd_get_battery_level_req_proc\n");
+	printk(KERN_INFO "[ICD] icd_get_battery_level_req_proc rsp_len :(%d)\n", rsp_len);
 	
 	pRsp = (DIAG_ICD_F_rsp_type *) diagpkt_alloc(DIAG_ICD_F, rsp_len);
 	if (pRsp == NULL) {
@@ -1045,27 +1383,9 @@ DIAG_ICD_F_rsp_type *icd_get_battery_level_req_proc(DIAG_ICD_F_req_type * pReq)
 	
 	pRsp->hdr.cmd_code = DIAG_ICD_F;
 	pRsp->hdr.sub_cmd = ICD_GETBATTERYLEVEL_REQ_CMD;
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL [s]
-	if(diagpdev != NULL)
-	{
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
-		update_diagcmd_state(diagpdev, "ICD_GETBATTERYLEVEL",  1); 
-	}
-	mdelay(100);
-	//memset(pRsp->icd_rsp.get_battery_level_rsp_info.battery_level, 0x0, ICD_MAX_STRING);
-	if(strcmp(process_value,"100") == 0)
-	{
-		pRsp->icd_rsp.get_battery_level_rsp_info.battery_level = 100;
-	}
-	else
-	{
-		crc_val = simple_strtoul(process_value,NULL,10);
-		pRsp->icd_rsp.get_battery_level_rsp_info.battery_level = crc_val;
-		//strcpy(pRsp->icd_rsp.get_battery_level_rsp_info.battery_level, process_value);
-		//pRsp->icd_rsp.get_battery_level_rsp_info.battery_level = process_value
-	}
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL [e]	
-	printk(KERN_INFO "[ICD]  crc_val :   %d    battery_level :  %d    process_value  : %s  \n",crc_val , pRsp->icd_rsp.get_battery_level_rsp_info.battery_level, process_value);
+	
+	// get battery level info
+	
 	return pRsp;
 }
 
@@ -1089,51 +1409,20 @@ DIAG_ICD_F_rsp_type *icd_get_bluetooth_status_req_proc(DIAG_ICD_F_req_type * pRe
 	pRsp->hdr.sub_cmd = ICD_GETBLUETOOTHSTATUS_REQ_CMD;
 	
 	// get bluetooth status info
-	if (diagpdev != NULL)
+	if(diagpdev != NULL)
 	{
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n", __func__);
+		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_GETBLUETOOTH", 1);
 		mdelay(50);
-//LG_BTUI_S
-// new
-        if (strcmp(process_status, "COMPLETED") == 0)
-        {		
-            if (strcmp(process_value, "GETBLUETOOTH_0x11") == 0)
-            {
-                pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 3;
-                printk(KERN_INFO "[ICD] %s was successful : status = %d\n", __func__, pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status);
-            }
-            else if (strcmp(process_value, "GETBLUETOOTH_0x01") == 0)
-            {
-                pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 1;
-                printk(KERN_INFO "[ICD] %s was successful : status = %d\n", __func__, pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status);
-            }
-            else if (strcmp(process_value, "GETBLUETOOTH_0x00") == 0)
-            {
-                pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 0;
-                printk(KERN_INFO "[ICD] %s was successful : status = %d\n", __func__, pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status);
-            }			
-            else
-            {
-                pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 0xFF;
-                printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
-            }
-        }
-        else
-        {
-            pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 0xFF;
-            printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
-        }
-// old
-/*
-		if (strcmp(process_status, "COMPLETED") == 0)
+
+		if(strcmp(process_status,"COMPLETED") == 0)
 		{		
-			if (strcmp(process_value, "GETBLUETOOTH_0") == 0)
+			if(strcmp(process_value,"GETBLUETOOTH_0") == 0)
 			{
 				pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 0;
 				printk(KERN_INFO "[ICD] %s was successful : status = %d\n",__func__,pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status);
 			}
-			else if (strcmp(process_value, "GETBLUETOOTH_1") == 0)
+			else if(strcmp(process_value,"GETBLUETOOTH_1") == 0)
 			{
 				pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 1;
 				printk(KERN_INFO "[ICD] %s was successful : status = %d\n",__func__,pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status);
@@ -1149,8 +1438,6 @@ DIAG_ICD_F_rsp_type *icd_get_bluetooth_status_req_proc(DIAG_ICD_F_req_type * pRe
 			pRsp->icd_rsp.get_bluetooth_status_rsp_info.bluetooth_status = 0xFF;
 			printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n",__func__);
 		}
-*/
-//LG_BTUI_E
 	}
 	else
 	{
@@ -1165,9 +1452,7 @@ DIAG_ICD_F_rsp_type *icd_set_bluetooth_status_req_proc(DIAG_ICD_F_req_type * pRe
 {
 	unsigned int rsp_len;
 	DIAG_ICD_F_rsp_type *pRsp;
-//LG_BTUI_S
-    unsigned int i = 0;
-//LG_BTUI_E
+	
 	rsp_len = sizeof(icd_set_bluetooth_status_rsp_type);
 	
 	printk(KERN_INFO "[ICD] icd_set_bluetooth_status_req_proc\n");
@@ -1183,81 +1468,40 @@ DIAG_ICD_F_rsp_type *icd_set_bluetooth_status_req_proc(DIAG_ICD_F_req_type * pRe
 	pRsp->hdr.sub_cmd = ICD_SETBLUETOOTHSTATUS_REQ_CMD;
 	
 	// set bluetooth status info
-	if (diagpdev != NULL)
+	if(diagpdev != NULL)
 	{
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n", __func__);
+		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_SETBLUETOOTH", pReq->icd_req.set_bluetooth_status_req_info.bluetooth_status);
 		mdelay(50);
-//LG_BTUI_S
-// new
-        while (i < 100)
-		{
-			if (strcmp(process_status, "COMPLETED") == 0)
-			{
-			    printk(KERN_INFO "[ICD] %s COMPLETED!!!\n", __func__);
-			    break;
-            }
-			mdelay(50);
-			i++;
-        }
 
-        if (strcmp(process_status, "COMPLETED") == 0)
-        {
-            if (strcmp(process_value, "SETBLUETOOTH_0") == 0)
-            {
-                pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0;
-                printk(KERN_INFO "[ICD] %s was successful \n", __func__);
-            }
-            else if (strcmp(process_value, "SETBLUETOOTH_1") == 0)
-            {
-                pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 1;
-                printk(KERN_INFO "[ICD] %s was unsuccessful\n", __func__);
-            }
-            else
-            {
-                pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0xFF;
-                printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
-            }
-        }
-        else
-        {
-            pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0xFF;
-            printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
-        }
-// old
-/*
-		mdelay(50);
-
-		if (strcmp(process_status,"COMPLETED") == 0)
+		if(strcmp(process_status,"COMPLETED") == 0)
 		{		
-			if (strcmp(process_value,"SETBLUETOOTH_0") == 0)
+			if(strcmp(process_value,"SETBLUETOOTH_0") == 0)
 			{
 				pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0;
-				printk(KERN_INFO "[ICD] %s was successful \n", __func__);
+				printk(KERN_INFO "[ICD] %s was successful \n",__func__);
 			}
-			else if (strcmp(process_value,"SETBLUETOOTH_1") == 0)
+			else if(strcmp(process_value,"SETBLUETOOTH_1") == 0)
 			{
 				pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 1;
-				printk(KERN_INFO "[ICD] %s was unsuccessful\n", __func__);
+				printk(KERN_INFO "[ICD] %s was unsuccessful\n",__func__);
 			}
 			else
 			{
 				pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0xFF;
-				printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
+				printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n",__func__);
 			}
 		}
 		else
 		{
 			pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0xFF;
-			printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n", __func__);
+			printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n",__func__);
 		}
-*/
-//LG_BTUI_E
 	}
 	else
 	{
 		pRsp->icd_rsp.set_bluetooth_status_rsp_info.cmd_status = 0xFF;
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n", __func__);
+		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n",__func__);
 	}
 	
 	return pRsp;
@@ -1330,8 +1574,7 @@ DIAG_ICD_F_rsp_type *icd_get_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 	pRsp->hdr.cmd_code = DIAG_ICD_F;
 	pRsp->hdr.sub_cmd = ICD_GETKEYPADBACKLIGHT_REQ_CMD;
 	
-	// get keypadbacklight status info
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
+	// get keypad backlight setting info
 	if(diagpdev != NULL)
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
@@ -1345,25 +1588,16 @@ DIAG_ICD_F_rsp_type *icd_get_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 15;
 				printk(KERN_INFO "[ICD] %s was successful : %dsec\n",__func__,pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight);
 			}
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETKEYPADBACKLIGHT  [s]
-			else if(strcmp(process_value,"GETKEYPADBACKLIGHT_30") == 0)
-			{
-				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 30;
-				printk(KERN_INFO "[ICD] %s was successful : %dsec\n",__func__,pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight);
-			}
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETKEYPADBACKLIGHT [e]
 			else if(strcmp(process_value,"GETKEYPADBACKLIGHT_50") == 0)
 			{
 				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 50;
 				printk(KERN_INFO "[ICD] %s was successful : %dsec\n",__func__,pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight);
 			}
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETKEYPADBACKLIGHT [s]			
-//			else if(strcmp(process_value,"GETKEYPADBACKLIGHT_NEVER") == 0)
-//			{
-//				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 0;
-//				printk(KERN_INFO "[ICD] %s was successful : %dsec\n",__func__,pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight);
-//			}
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETKEYPADBACKLIGHT [e]			
+			else if(strcmp(process_value,"GETKEYPADBACKLIGHT_NEVER") == 0)
+			{
+				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 0;
+				printk(KERN_INFO "[ICD] %s was successful : %dsec\n",__func__,pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight);
+			}
 			else if(strcmp(process_value,"GETKEYPADBACKLIGHT_ALWAYS") == 0)
 			{
 				pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 100;
@@ -1386,9 +1620,10 @@ DIAG_ICD_F_rsp_type *icd_get_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 		pRsp->icd_rsp.get_keypadbacklight_rsp_info.keypad_backlight = 0x00;
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n",__func__);
 	}
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 	
 	return pRsp;
+
+
 }
 
 DIAG_ICD_F_rsp_type *icd_set_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq)
@@ -1398,7 +1633,7 @@ DIAG_ICD_F_rsp_type *icd_set_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 	
 	rsp_len = sizeof(icd_set_keypadbacklight_rsp_type);
 	
-	printk(KERN_INFO "[ICD] icd_set_keypadbacklight_req_proc\n");
+	printk(KERN_INFO "[ICD] icd_set_keypadbacklight_req_proc, req = %d\n",pReq->icd_req.set_keypadbacklight_req_info.keypad_backlight);
 	printk(KERN_INFO "[ICD] icd_set_keypadbacklight_req_proc rsp_len :(%d)\n", rsp_len);
 	
 	pRsp = (DIAG_ICD_F_rsp_type *) diagpkt_alloc(DIAG_ICD_F, rsp_len);
@@ -1411,7 +1646,6 @@ DIAG_ICD_F_rsp_type *icd_set_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 	pRsp->hdr.sub_cmd = ICD_SETKEYPADBACKLIGHT_REQ_CMD;
 	
 	// set keypadbacklight status info
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	if(diagpdev != NULL)
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
@@ -1447,7 +1681,6 @@ DIAG_ICD_F_rsp_type *icd_set_keypadbacklight_req_proc(DIAG_ICD_F_req_type * pReq
 		pRsp->icd_rsp.set_keypadbacklight_rsp_info.cmd_status = 0xFF;
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n",__func__);
 	}
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 	
 	return pRsp;
 }
@@ -1480,7 +1713,6 @@ DIAG_ICD_F_rsp_type *icd_get_rssi_req_proc(DIAG_ICD_F_req_type * pReq)
 {
 	unsigned int rsp_len;
 	DIAG_ICD_F_rsp_type *pRsp;
-	int rssi, ecio, no_of_bar, status;  	/* [dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI  */ 
 	
 	rsp_len = sizeof(icd_get_rssi_rsp_type);
 	
@@ -1497,38 +1729,7 @@ DIAG_ICD_F_rsp_type *icd_get_rssi_req_proc(DIAG_ICD_F_req_type * pReq)
 	pRsp->hdr.sub_cmd = ICD_GETRSSI_REQ_CMD;
 	
 	// get RSSI info
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [s] 	
-	if(diagpdev != NULL)
-	{
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
-		update_diagcmd_state(diagpdev, "ICD_GETRSSI", 0);
-		mdelay(100);
 	
-		if(strcmp(process_status,"COMPLETED") == 0)
-		{
-			// printk(KERN_INFO "[ICD] %s process_value = %s\n",__func__, process_value);
-
-			sscanf(process_value, "%d %d %d %d", &rssi, &ecio, &no_of_bar, &status);
-			pRsp->icd_rsp.get_rssi_rsp_info.rx_power = rssi*100; /* multiplied by 100 due to req. */
-			pRsp->icd_rsp.get_rssi_rsp_info.rx_ec_io = ecio*10; /* multiplied by 100 due to req. & already multiplied by 10 */
-			pRsp->icd_rsp.get_rssi_rsp_info.numbar = no_of_bar;
-			pRsp->icd_rsp.get_rssi_rsp_info.status = status;
-	
-			printk(KERN_INFO "[ICD] %s rssi = %d(%d)\n",__func__, pRsp->icd_rsp.get_rssi_rsp_info.rx_power, rssi);
-			printk(KERN_INFO "[ICD] %s ecio = %d(%d)\n",__func__, pRsp->icd_rsp.get_rssi_rsp_info.rx_ec_io, ecio);
-			printk(KERN_INFO "[ICD] %s bars = %d(%d)\n",__func__, pRsp->icd_rsp.get_rssi_rsp_info.numbar, no_of_bar);
-			printk(KERN_INFO "[ICD] %s status = %d(%d)\n",__func__, pRsp->icd_rsp.get_rssi_rsp_info.status, status);
-		}
-		else
-		{			
-			printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid\n",__func__);
-		}
-	}
-	else
-	{		
-		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n",__func__);
-	}	
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [e] 	
 	return pRsp;
 }
 
@@ -1808,9 +2009,7 @@ DIAG_ICD_F_rsp_type *icd_set_screenorientationlock_req_proc(DIAG_ICD_F_req_type 
 	{
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather\n",__func__);
 		update_diagcmd_state(diagpdev, "ICD_SETORIENTATIONLOCK", pReq->icd_req.set_screenorientationlock_req_info.orientation_mode);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		mdelay(200);
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 		if(strcmp(process_status,"COMPLETED") == 0)
 		{
 			if(strcmp(process_value,"SETORIENTATION_0") == 0)
@@ -1938,32 +2137,24 @@ DIAG_ICD_F_rsp_type* icd_set_usbdebug_status_req_proc(DIAG_ICD_F_req_type * pReq
 			}
 			else if(strcmp(process_value,"SETUSBDEBUGSTATUS_1") == 0)
 			{
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 				pRsp->icd_rsp.set_usbdebug_status_rsp_info.cmd_status = 0;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 				printk(KERN_INFO "[ICD] %s was unsuccessful\n",__func__);
 			}
 			else
 			{
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 				pRsp->icd_rsp.set_usbdebug_status_rsp_info.cmd_status = 1;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 				printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid 1\n",__func__);
 			}
 		}
 		else
 		{
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 			pRsp->icd_rsp.set_usbdebug_status_rsp_info.cmd_status = 1;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 			printk(KERN_INFO "[ICD] %s return value from DiagCommandDispather is invalid 2\n",__func__);
 		}
 	}
 	else
 	{
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 		pRsp->icd_rsp.set_usbdebug_status_rsp_info.cmd_status = 1;
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 		printk(KERN_INFO "[ICD] %s goto DiagCommandDispather : Error cannot open diagpdev\n",__func__);
 	}
 	
@@ -2093,60 +2284,38 @@ DIAG_ICD_F_rsp_type* icd_set_screenlock_status_req_proc(DIAG_ICD_F_req_type * pR
 	return pRsp;
 }
 
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [Start]
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
+/* START 2011.11.13 jaeho.cho@lge.com to get USB serial number */
+#ifdef CONFIG_LGE_USB_EXPORT_SERIAL_NUMBER
+extern void android_get_serial_number(char *snum);
+#endif
+/* END 2011.11.13 jaeho.cho@lge.com to get USB serial number */
 DIAG_ICD_F_rsp_type* icd_get_android_identifier_req_proc(DIAG_ICD_F_req_type * pReq)
 {
-	unsigned int rsp_len;
+	unsigned int rsp_len;	
 	DIAG_ICD_F_rsp_type *pRsp;
-
-	//yckim.kim@lge.com 2012.04.05 : GetAndroidIdentifier cmd add [START]
-	int id_fd;
-	int read_size=0;
-	char id_buf[34];
-
-	memset(id_buf,0,sizeof(char) * 34);  //yckim.kim@lge.com 2012.05.03: garbage charactor remove
-	//yckim.kim@lge.com 2012.04.05 : GetAndroidIdentifier cmd add [END]
-
+/* START 2011.11.13 jaeho.cho@lge.com to get USB serial number */
+#ifdef CONFIG_LGE_USB_EXPORT_SERIAL_NUMBER
+	char serial_number[256];
+	  
+	android_get_serial_number(serial_number);
+#endif
+/* END 2011.11.13 jaeho.cho@lge.com to get USB serial number */
 	rsp_len = sizeof(icd_get_android_identifier_rsp_type);
 
-
-	//printk( "[ICD] get android identifier req \n");  //yckim.kim@lge.com 2012.05.03: garbage charactor remove
-	//printk( "[ICD] get android identifier rsp_len :(%d)\n", rsp_len);  //yckim.kim@lge.com 2012.05.03: garbage charactor remove
-
+	printk(KERN_INFO "[ICD] icd_get_android_identifier_req_proc req \n");
+	printk(KERN_INFO "[ICD] icd_info_req_proc rsp_len :(%d)\n", rsp_len);
+	
 	pRsp = (DIAG_ICD_F_rsp_type *) diagpkt_alloc(DIAG_ICD_F, rsp_len);
-	if (pRsp == NULL) {
-			 printk("[ICD] diagpkt_alloc failed\n");
-			 return pRsp;
-	}
 
-	pRsp->hdr.cmd_code = DIAG_ICD_F;
-	pRsp->hdr.sub_cmd = ICD_GETANDROIDIDENTIFIER_REQ_CMD;
-
-	//char * returnStr = pRsp->icd_rsp.get_android_identifier_rsp_info.android_id_string;
-
-	//yckim.kim@lge.com 2012.04.05 : GetAndroidIdentifier cmd add [START]
-	id_fd = sys_open("/sys/class/android_usb/android0/iSerial", 0, 0);
-
-	if(id_fd < 0) {
-			 printk("%s, STATUS File Open Fail\n",__func__);
-			 return pRsp;
-	}
-
-	memset(id_buf,0,sizeof(char) * 34);  //yckim.kim@lge.com 2012.05.03: garbage charactor remove
-	while(sys_read(id_fd, &id_buf[read_size++], 1) == 1){}
-	sys_close(id_fd);
-
-	memset(pRsp->icd_rsp.get_android_identifier_rsp_info.android_id_string, 0, VARIABLE);
-	sprintf(pRsp->icd_rsp.get_android_identifier_rsp_info.android_id_string,"%s", id_buf);
-	printk( "[ICD] get android identifier android_id_string = %s   id_buf = %s \n",pRsp->icd_rsp.get_android_identifier_rsp_info.android_id_string, id_buf);
-	//yckim.kim@lge.com 2012.04.05 : GetAndroidIdentifier cmd add [END]
-
+/* START 2011.11.13 jaeho.cho@lge.com to get USB serial number */
+#ifdef CONFIG_LGE_USB_EXPORT_SERIAL_NUMBER
+	pRsp->hdr.cmd_code = 0xF6;
+	pRsp->hdr.sub_cmd = 0x47;
+	snprintf(pRsp->icd_rsp.get_android_identifier_rsp_info.android_id_string, VARIABLE, serial_number);	
+#endif
+/* END 2011.11.13 jaeho.cho@lge.com to get USB serial number */
 	return pRsp;
 }
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [End]
-
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 
 //  20111125 [end] suhyun.lee@lge.com SLATE ICD 231,232,238 Merge From LS840 
 /** ICDR : ICD Implementation Recommendation  - END **/
@@ -2173,33 +2342,25 @@ icd_user_table_entry_type icd_mstr_tbl[ICD_MSTR_TBL_SIZE] = {
 	{ICD_SETBACKLIGHTSETTING_REQ_CMD,			icd_set_backlight_setting_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_GETBATTERYCHARGINGSTATE_REQ_CMD,			NULL,						ICD_ARM9_PROCESSOR},
 	{ICD_SETBATTERYCHARGINGSTATE_REQ_CMD,			NULL,						ICD_ARM9_PROCESSOR},
-//[dugyung.ahn@lge.com] 2012-05-01, [Slate] GETBATTERYLEVEL [s]
-	{ICD_GETBATTERYLEVEL_REQ_CMD,				icd_get_battery_level_req_proc,			ICD_ARM11_PROCESSOR},
+	{ICD_GETBATTERYLEVEL_REQ_CMD,				NULL,						ICD_ARM9_PROCESSOR},
 	{ICD_GETBLUETOOTHSTATUS_REQ_CMD,			icd_get_bluetooth_status_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_SETBLUETOOTHSTATUS_REQ_CMD,			icd_set_bluetooth_status_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_GETGPSSTATUS_REQ_CMD,					NULL,									ICD_ARM9_PROCESSOR},
 	{ICD_SETGPSSTATUS_REQ_CMD,					NULL,									ICD_ARM9_PROCESSOR},
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [Start]
 	{ICD_GETKEYPADBACKLIGHT_REQ_CMD,			icd_get_keypadbacklight_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_SETKEYPADBACKLIGHT_REQ_CMD,			icd_set_keypadbacklight_req_proc,		ICD_ARM11_PROCESSOR},
-//LGE_CHANGE jinhwan.do 20120323 Slate source merge from LS696 [End]
 	{ICD_GETROAMINGMODE_REQ_CMD,				NULL,									ICD_ARM9_PROCESSOR},
 	{ICD_GETSTATEANDCONNECTIONATTEMPTS_REQ_CMD,	NULL,									ICD_ARM9_PROCESSOR},
 	{ICD_GETUISCREENID_REQ_CMD,					icd_get_ui_screen_id_req_proc,			ICD_ARM11_PROCESSOR},
 	{ICD_GETWIFISTATUS_REQ_CMD,					icd_get_wifi_status_req_proc,			ICD_ARM11_PROCESSOR},
 	{ICD_SETWIFISTATUS_REQ_CMD,					icd_set_wifi_status_req_proc,			ICD_ARM11_PROCESSOR},
 	{ICD_SETSCREENORIENTATIONLOCK_REQ_CMD,		icd_set_screenorientationlock_req_proc,	ICD_ARM11_PROCESSOR},
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [s]	
-//	{ICD_GETRSSI_REQ_CMD,						NULL,					ICD_ARM9_PROCESSOR},
-	{ICD_GETRSSI_REQ_CMD,						icd_get_rssi_req_proc,					ICD_ARM11_PROCESSOR},	
-//[dugyung.ahn@lge.com] 2012-06-27, [Slate] GETRSSI [e]
+	{ICD_GETRSSI_REQ_CMD,						NULL,					ICD_ARM9_PROCESSOR},
 	{ICD_GETUSBDEBUGSTATUSSTATUS_REQ_CMD,		icd_get_usbdebug_status_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_SETUSBDEBUGSTATUSSTATUS_REQ_CMD,		icd_set_usbdebug_status_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_GETLATITUDELONGITUDEVALUES_REQ_CMD,	NULL,					ICD_ARM9_PROCESSOR},
 	{ICD_GETSCREENLOCKSTATUS_REQ_CMD,			icd_get_screenlock_status_req_proc,		ICD_ARM11_PROCESSOR},
 	{ICD_SETSCREENLOCKSTATUS_REQ_CMD,			icd_set_screenlock_status_req_proc,		ICD_ARM11_PROCESSOR},
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [Start]
-	{ICD_GETANDROIDIDENTIFIER_REQ_CMD,			icd_get_android_identifier_req_proc,	ICD_ARM11_PROCESSOR},
-//LGE_CHANGE jinhwan.do 20120430 Slate command's concept is cahnged, USB Serial number is MEID's decimal value [End]
+	{ICD_GETANDORIDIDENTIFIER_REQ_CMD,			icd_get_android_identifier_req_proc,	ICD_ARM11_PROCESSOR},
 	/** ICDR : ICD Implementation Recommendation  - END **/
 };

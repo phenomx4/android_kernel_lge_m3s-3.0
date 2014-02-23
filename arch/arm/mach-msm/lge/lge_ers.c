@@ -209,19 +209,18 @@ static ssize_t lte_ers_panic_store(struct device *dev, struct device_attribute *
 static DEVICE_ATTR(lte_ers_panic, 0664 , NULL, lte_ers_panic_store); //#2011.07.28 - CTS FAIL android.permission.cts.FileSystemPermissionTest#testAllBlockDevicesAreNotReadableWritable
 //static DEVICE_ATTR(lte_ers_panic, S_IRUGO | S_IWUGO, NULL, lte_ers_panic_store);
 
-#ifdef CONFIG_LGE_LTE_CRASH_RECOVERY
-// ONLY TEST
-extern int lte_crash_recovery_test_flag;
-
-static ssize_t lte_crash_recovery_test_show(struct device *dev, struct device_attribute *attr, char *buf)
+#ifdef CONFIG_LGE_LTE_TIMEOUT_DBG
+extern void lte_sdio_wake_up_tx_skip(unsigned long arg);
+extern void lte_sdio_rx_timeout_func(unsigned long arg);
+static ssize_t lte_ers_timeout_test_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d\n", lte_crash_recovery_test_flag);
+	return sprintf(buf, "usage :\n  1 : watchdog timeout\n  2 : AP->L2000 wakeup timeout\n  3 : AP<-L2000 RX timeout\n");
 }
 
-// File : /sys/devices/platform/ers-kernel.0/lte_crash_recovery_test
-static ssize_t lte_crash_recovery_test_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+static ssize_t lte_ers_timeout_test_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
 {
 	unsigned long cmd=0;
+	char *test_buf = NULL;
 
 	if(buf == NULL)
 	{
@@ -229,30 +228,50 @@ static ssize_t lte_crash_recovery_test_store(struct device *dev, struct device_a
 		return 0;
 	}
 
+	test_buf = kzalloc(50, GFP_KERNEL); //LTE_WDT_LOG_SIZE = 50
+	if(test_buf == NULL)
+	{
+		printk(KERN_ERR "allocation failed\n", __func__);	
+		return 0;
+	}
+
 	cmd = simple_strtoul(buf,NULL,10);
 
 	switch(cmd)
 	{
-		case 0:
-		lte_crash_recovery_test_flag = 0;			
-		printk(KERN_ERR "%s : lte_crash_recovery_test_flag = %d cmd \n", __func__,lte_crash_recovery_test_flag);		
-		break;
+		case 1: //watchdog timeout
+			sprintf(test_buf, "[TIMEOUT TEST] attr = WATCHDOG TIMEOUT\n");
+			lte_crash_log(test_buf, 50, LTE_WDT_RESET);
+			break;
 
-		case 1:
-		lte_crash_recovery_test_flag = 1;	
-		printk(KERN_ERR "%s : lte_crash_recovery_test_flag = %d cmd \n", __func__,lte_crash_recovery_test_flag);		
-		break;
+		case 2: //AP->L2000 wakeup timeout
+			lte_sdio_wake_up_tx_skip(0);
+			break;
 
+		case 3: //AP<-L2000 RX timeout
+			lte_sdio_rx_timeout_func(0);
+			break;
+			
 		default:
-		printk(KERN_ERR "%s : Unknown command : %d\n", __func__, cmd);	
-		break;
+			printk(KERN_ERR "Unknown command : %d\n", __func__, cmd);	
+			break;
 	}	
 	
 	return 0;
 }
+static DEVICE_ATTR(lte_ers_timeout_test, 0664 , lte_ers_timeout_test_show, lte_ers_timeout_test_store);
 
-static DEVICE_ATTR(lte_crash_recovery_test, 0664 , lte_crash_recovery_test_show, lte_crash_recovery_test_store);
-#endif /* CONFIG_LGE_LTE_CRASH_RECOVERY */
+
+void set_lte_status_to_display(int status)
+{
+	ustate = status;
+
+	switch_set_state(&sdev_lte, ustate);
+	
+	printk("%s: ustate = %d\n", __func__, ustate);
+}	
+EXPORT_SYMBOL(set_lte_status_to_display);
+#endif
 
 int lte_crash_log_in(void *buffer, unsigned int size, unsigned int reserved)
 {
@@ -282,6 +301,11 @@ int lte_crash_log_in(void *buffer, unsigned int size, unsigned int reserved)
 	lte_panic_report(temp->lte_magic);
 	temp->lte_magic = 0;
 	//[END] 2011.06.16
+
+// do not enable crash reset to display status
+#ifdef CONFIG_LGE_LTE_TIMEOUT_DBG
+	return 0;
+#endif
 
 // This feature will be defined in case user variant
 // Since lte_log_handled will not be set in the user-signed image ASSERT and WDT_RESET
@@ -314,12 +338,15 @@ int lte_crash_log(void *buffer, unsigned int size, unsigned int reserved)
 #ifdef CONFIG_LGE_FEATURE_RELEASE
 	return 0;
 #else
+// do not return to display status
+#ifndef CONFIG_LGE_LTE_TIMEOUT_DBG
 	/* if watchDogReset is occured, jsut reset */
 	if( reserved == LTE_WDT_RESET) {
 		//lte_crash_log_in(buffer, size, reserved);
 		return 0;
 	}
 #endif
+#endif /*CONFIG_LGE_FEATURE_RELEASE*/
 	//[END] 2011.06.16
 
 /* neo.kang@lge.com 11.01.05 E */
@@ -333,7 +360,15 @@ int lte_crash_log(void *buffer, unsigned int size, unsigned int reserved)
 		switch_set_state(&sdev_lte, ustate);
 	}
 	*/
+	
+#ifdef CONFIG_LGE_LTE_TIMEOUT_DBG
+	if( reserved == LTE_WDT_RESET)
+		ustate = S_L2K_WDT_ATTR;
+	else
+		ustate = S_L2K_RAM_DUMP_ATTR_PREV;	
+#else
 	ustate = S_L2K_RAM_DUMP_ATTR_PREV;
+#endif
 	switch_set_state(&sdev_lte, ustate);
 	
 	printk("%s: ustate = %d\n", __func__, ustate);
@@ -821,7 +856,7 @@ static ssize_t ers_panic_store(struct device *dev, struct device_attribute *attr
 		return 0;
 	}
 
-	printk(KERN_INFO "%s, ram_misc_buffer : 0x%x\n", __func__, (int)ram_misc_buffer);
+	printk(KERN_INFO "%s, ram_misc_buffer : 0x%x\n", __func__, ram_misc_buffer);
 
 	if(ram_misc_buffer->magic_key == PANIC_MAGIC_KEY)
 	{
@@ -867,18 +902,16 @@ static ssize_t set_modem_auto_action_store(struct device *dev, struct device_att
 
 	printk("### 0 : download, 1 : reset, 2 : no_action\n");
 	printk("### set modem err auto action type : %lu\n", val);
-	msm_proc_comm(PCOM_OEM_SET_AUTO_ACTION_TYPE_CMD, (unsigned *)&val, (unsigned *)0); 
+	msm_proc_comm(PCOM_OEM_SET_AUTO_ACTION_TYPE_CMD, &val, 0); 
 
 	return size;
 }
 static DEVICE_ATTR(set_modem_auto_action, 0664 , 0, set_modem_auto_action_store); //#2011.07.28 - CTS FAIL android.permission.cts.FileSystemPermissionTest#testAllBlockDevicesAreNotReadableWritable
 //static DEVICE_ATTR(set_modem_auto_action, S_IRUGO | S_IWUGO, 0, set_modem_auto_action_store);
 
-/*
 static struct notifier_block ers_block = {
 	    .notifier_call  = panic_report,
 };
-*/
 
 #ifdef CONFIG_LGE_LTE_ERS
 static ssize_t print_switch_name(struct switch_dev *sdev, char *buf)
@@ -896,16 +929,14 @@ static int __devinit ers_probe(struct platform_device *pdev)
 {
 	int ret;
 
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	struct membank *bank1 = &meminfo.bank[1];
 #else
 	struct membank *bank = &meminfo.bank[0];
 #endif
 
 	// panic will be handled in lge_handle_panic.c and use this as ers store after re-boot
-	/*
-	atomic_notifier_chain_register(&panic_notifier_list, &ers_block);
-	*/
+	//atomic_notifier_chain_register(&panic_notifier_list, &ers_block);
 
 	ret = device_create_file(&pdev->dev, &dev_attr_ers);
 	if (ret < 0) {
@@ -965,8 +996,8 @@ static int __devinit ers_probe(struct platform_device *pdev)
 		
 /* neo.kang@lge.com	10.12.29. E */
 
-#ifdef CONFIG_LGE_LTE_CRASH_RECOVERY
-	ret = device_create_file(&pdev->dev, &dev_attr_lte_crash_recovery_test);
+#ifdef CONFIG_LGE_LTE_TIMEOUT_DBG
+	ret = device_create_file(&pdev->dev, &dev_attr_lte_ers_timeout_test);
 	if (ret < 0) {
 		printk("device_create_file error!\n");
 		return ret;
@@ -981,7 +1012,7 @@ static int __devinit ers_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	ram_misc_buffer = ioremap(bank1->start + bank1->size + LGE_RAM_CONSOLE_SIZE, LGE_RAM_CONSOLE_MISC_SIZE);
 #else
 	ram_misc_buffer = ioremap(bank->start + bank->size + LGE_RAM_CONSOLE_SIZE, LGE_RAM_CONSOLE_MISC_SIZE);
@@ -993,7 +1024,7 @@ static int __devinit ers_probe(struct platform_device *pdev)
 		printk("\n### ram_misc : ok map memory at %08x!!, size %zx !!\n", (unsigned int)ram_misc_buffer, LGE_RAM_CONSOLE_MISC_SIZE);
 
 #ifdef CONFIG_LGE_LTE_ERS
-#if defined (CONFIG_MACH_LGE_M3S) || defined (CONFIG_MACH_MSM7630_U0)
+#ifdef CONFIG_MACH_LGE_M3S
 	ram_lte_log_buf = ioremap(bank1->start + bank1->size + LGE_RAM_CONSOLE_SIZE + LGE_RAM_CONSOLE_MISC_SIZE, LTE_LOG_SIZE);
 #else
 	ram_lte_log_buf = ioremap(bank->start + bank->size + LGE_RAM_CONSOLE_SIZE + LGE_RAM_CONSOLE_MISC_SIZE, LTE_LOG_SIZE);
@@ -1019,6 +1050,10 @@ static int __devexit ers_remove(struct platform_device *pdev)
 {	
 	device_remove_file(&pdev->dev, &dev_attr_ers);
 	device_remove_file(&pdev->dev, &dev_attr_ers_panic);
+
+#ifdef CONFIG_LGE_LTE_TIMEOUT_DBG
+	device_remove_file(&pdev->dev, &dev_attr_lte_ers_timeout_test);
+#endif
 
 	return 0;
 }

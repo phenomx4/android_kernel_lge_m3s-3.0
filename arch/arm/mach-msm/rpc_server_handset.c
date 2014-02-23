@@ -223,6 +223,11 @@ struct msm_handset {
 static struct msm_rpc_client *rpc_client;
 static struct msm_handset *hs;
 
+#ifdef CONFIG_LGE_DIAG
+extern int key_touch_logging_status;
+extern void mtc_send_key_log_packet(unsigned long keycode, unsigned long state);
+#endif
+
 static int hs_find_key(uint32_t hscode)
 {
 	int i, key;
@@ -620,7 +625,14 @@ static int __devinit hs_probe(struct platform_device *pdev)
 	if (!hs)
 		return -ENOMEM;
 
+/* ehgrace.kim@lge.com	10.08.17 
+ * 	change the hs device name because it is used for headset observer
+ */
+#if defined (CONFIG_MACH_LGE_M3S)
+	hs->sdev.name	= "msm-h2w";
+#else
 	hs->sdev.name	= "h2w";
+#endif /*CONFIG_MACH_LGE_M3S*/
 	hs->sdev.print_name = msm_headset_print_name;
 
 	rc = switch_dev_register(&hs->sdev);

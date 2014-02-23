@@ -144,7 +144,7 @@ static struct platform_device flash_i2c_device = {
 };
 
 static struct led_flash_platform_data lm3559_flash_pdata = {
-	.gpio_en = GPIO_FLASH_EN,
+	.gpio_flen = GPIO_FLASH_EN,
 };
 
 static struct i2c_board_info i2c_camera_flash_devices[] = {

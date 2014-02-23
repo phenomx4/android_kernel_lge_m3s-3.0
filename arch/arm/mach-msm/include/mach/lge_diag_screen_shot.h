@@ -14,8 +14,8 @@
   #error No PACK() macro defined for this compiler
 #endif
 /********************** END PACK() Definition *****************************/
-#define LCD_MAIN_WIDTH   480
-#define LCD_MAIN_HEIGHT  800
+#define LCD_MAIN_WIDTH   320
+#define LCD_MAIN_HEIGHT  480
 
 #define SCREEN_SHOT_PACK_LEN  1024 * 2
 //#define SCREEN_SHOT_PACK_LEN  100 * 2
@@ -51,10 +51,8 @@ typedef struct
   boolean  packed;
   boolean  is_fast_mode;
   boolean  full_draw;
-  //byte buftmp[LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4]; 
-  //byte buf[LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 2];
-  byte *buftmp;
-  byte *buf;
+  byte buftmp[LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4]; 
+  byte buf[LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 2];
 }PACKED lcd_buf_info_type;
 
 

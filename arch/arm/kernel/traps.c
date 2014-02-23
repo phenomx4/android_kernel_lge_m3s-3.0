@@ -276,6 +276,7 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 
 // notify kernel panic to CP
 #ifdef CONFIG_LGE_ERS
+	printk(KERN_EMERG"[EFS_SYNC] KERNEL PANIC! SKIP EFS SYNC! SKIP CHARGER LOGO! \n"); // LS696_me : add dbg msg for efs sync
 	msm_proc_comm(PCOM_OEM_AP_PANIC_CMD, 0, 0);
 #endif
 

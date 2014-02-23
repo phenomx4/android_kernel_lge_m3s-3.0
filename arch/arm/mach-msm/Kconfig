@@ -48,7 +48,6 @@ config ARCH_MSM7X30
 	select MEMORY_HOTREMOVE
 	select ARCH_ENABLE_MEMORY_HOTPLUG
 	select ARCH_ENABLE_MEMORY_HOTREMOVE
-	select HOLES_IN_ZONE
 	select MIGRATION
 	select ARCH_MEMORY_PROBE
 	select ARCH_MEMORY_REMOVE
@@ -721,7 +720,7 @@ config MACH_FSM9XXX_SURF
 
 endmenu
 
-#LGE_BUILD_ENV
+# LGE_CHANGE [2011.07.07] M3S build operation : add lge Kconfig
 source "arch/arm/mach-msm/lge/Kconfig"
 
 config MSM_STACKED_MEMORY

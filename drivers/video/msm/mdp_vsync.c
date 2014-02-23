@@ -422,7 +422,7 @@ void mdp_vsync_resync_workqueue_handler(struct work_struct *work)
 			    (struct msm_fb_panel_data *)mfd->pdev->dev.
 			    platform_data;
 
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_MACH_LGE_M3S
 			/*
 			 * we need to turn on MDP power if it uses MDP vsync
 			 * HW block in SW mode

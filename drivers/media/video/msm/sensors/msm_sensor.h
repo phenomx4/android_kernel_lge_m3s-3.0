@@ -135,6 +135,10 @@ struct msm_sensor_fn_t {
 	int32_t (*sensor_match_id)(struct msm_sensor_ctrl_t *s_ctrl);
 	int (*sensor_adjust_frame_lines)
 		(struct msm_sensor_ctrl_t *s_ctrl, uint16_t res);
+// [QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
+	int (*sensor_get_eeprom_data) (struct msm_sensor_ctrl_t *,
+		struct sensor_cfg_data *);
+// [QCTK] CALC start keonwoo01.park@lge.com 2012-05-19 from QCT
 };
 
 struct msm_sensor_ctrl_t {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,8 +31,11 @@
 #define VOLANS_MAN_ID             0x70
 #define VOLANS_REV_1_0_CARD_ID    0x0
 #define VOLANS_REV_2_0_CARD_ID    0x2881
+
+/*LGE_CHANGE_S, real-wifi@lge.com, 111031, [reduce Wi-Fi Power up time*/
 #define GET_INODE_FROM_FILEP(filp) \
-		((filp)->f_path.dentry->d_inode)
+    ((filp)->f_path.dentry->d_inode)
+/*LGE_CHANGE_E, real-wifi@lge.com, 111031, [reduce Wi-Fi Power up time*/
 
 typedef int (suspend_handler_t)(struct sdio_func *);
 typedef void (resume_handler_t)(struct sdio_func *);
@@ -82,5 +85,7 @@ int libra_sdio_notify_card_removal(
 		notify_card_removal_t *libra_sdio_notify_card_removal_hdlr);
 int libra_sdio_register_shutdown_hdlr(
 		shutdown_handler_t *libra_shutdown_hdlr);
+/*LGE_CHANGE_S, real-wifi@lge.com, 111031, [reduce Wi-Fi Power up time*/
 void enable_mmchost_detect_change(const char *mmc_msm_dev, int enable);
+/*LGE_CHANGE_S, real-wifi@lge.com, 111031, [reduce Wi-Fi Power up time*/
 #endif /* __LIBRA_SDIOIF_H__ */

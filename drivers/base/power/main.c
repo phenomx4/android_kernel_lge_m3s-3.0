@@ -68,6 +68,7 @@ static int async_error;
  */
 void device_pm_init(struct device *dev)
 {
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
 	dev->power.is_prepared = false;
 	dev->power.is_suspended = false;
 	init_completion(&dev->power.completion);
@@ -501,6 +502,7 @@ static int legacy_resume(struct device *dev, int (*cb)(struct device *dev))
 	int error;
 	ktime_t calltime;
 
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
 	calltime = initcall_debug_start(dev);
 
 	error = cb(dev);
@@ -634,6 +636,7 @@ void dpm_resume(pm_message_t state)
 	struct device *dev;
 	ktime_t starttime = ktime_get();
 
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
 	might_sleep();
 
 	mutex_lock(&dpm_list_mtx);
@@ -867,6 +870,7 @@ static int legacy_suspend(struct device *dev, pm_message_t state,
 	int error;
 	ktime_t calltime;
 
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
 	calltime = initcall_debug_start(dev);
 
 	error = cb(dev, state);
@@ -994,6 +998,7 @@ int dpm_suspend(pm_message_t state)
 	ktime_t starttime = ktime_get();
 	int error = 0;
 
+	//printk(KERN_INFO"%s:%d entry", __func__, __LINE__);
 	might_sleep();
 
 	mutex_lock(&dpm_list_mtx);

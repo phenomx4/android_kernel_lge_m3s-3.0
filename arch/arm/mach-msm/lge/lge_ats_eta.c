@@ -18,33 +18,14 @@
 #include <mach/msm_rpcrouter.h>
 #include <linux/syscalls.h>
 #include <linux/fcntl.h>
-//#include <mach/board-bryce.h>
-#include <linux/lge_at_cmd.h>
-#include "lge_ats.h"
-//#include "mach/lge_diag_test.h"
-
-#include <mach/lg_backup_items.h>
+#include <mach/board_lge.h>
+#include <mach/lge_at.h>
 #include <linux/slab.h>
+#include <mach/lge_ats.h>
+#include <mach/lge_diag_test.h>
+#include <linux/delay.h>
 
-/* ADD 0012790: [ERI] DIAG DOWNLOAD */
-#ifdef CONFIG_LGE_ERI_DOWNLOAD
-#include <linux/unistd.h> /*for open/close*/
-//#include <linux/fcntl.h> /*for O_RDWR*/
-#include <linux/uaccess.h>
-//#include <linux/fs.h> // for file struct
-#include <linux/types.h> // for ssize_t, size_t
-#include <linux/syscalls.h>
-
-
-/* ADD 0013860: [FACTORY RESET] ERI file save */
-// from android_filesystem_config.h
-#ifndef AID_RADIO
-#define AID_RADIO         1001  /* telephony subsystem, RIL */
-#endif
-
-static ssize_t written_size = 0; // save the written size for the writting position
-#endif
-
+#include <mach/lge_backup_items.h>  // LS696_me : CAL BACKUP merge
 #define JIFFIES_TO_MS(t) ((t) * 1000 / HZ)
 
 /* LGE_CHANGE
@@ -53,10 +34,6 @@ static ssize_t written_size = 0; // save the written size for the writting posit
  */
 #ifdef CONFIG_LGE_DIAG_MTC
 extern unsigned char g_diag_mtc_check;
-#endif
-
-#ifdef CONFIG_LGE_DIAG_ICD
-extern unsigned char g_diag_icd_check;
 #endif
 
 unsigned int ats_mtc_log_mask = 0x00000000;
@@ -70,18 +47,15 @@ extern int event_log_end(void);
 #define ETA_CMD_STR "/system/bin/eta"
 #define ETA_SHELL_STR "/system/bin/sh"
 
-int eta_execute_n(char *string, size_t size)
+int eta_execute_n(char *string, size_t size, int wait)
 {
 	int ret;
+	static char cmdstr[LIMIT_MAX_SEND_SIZE_BUFFER];
 
 	char *envp[] = {
 		"HOME=/",
 		"TERM=linux",
-#ifdef CONFIG_LGE_ATS_ETA_TIMEOUT
-		"timeout=10",
-#else
 		NULL,
-#endif
 	};
 
 	char *argv[] = {
@@ -92,11 +66,22 @@ int eta_execute_n(char *string, size_t size)
 
 	size += 1;
 
-	argv[1] = string;
+//	if (!(cmdstr = kmalloc(size, GFP_KERNEL)))
+//	{
+//		return ENOMEM;
+//	}
 
+	argv[1] = cmdstr;
+	memset(cmdstr, 0, sizeof(cmdstr));
+
+	snprintf(cmdstr, size, "%s", string);
 	printk(KERN_INFO "[ETA]execute eta : data - %s\n", string);
 
-	if ((ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC)) != 0) {
+	if (wait == 1)
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+	else
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_NO_WAIT);
+	if (ret != 0) {
 		printk(KERN_ERR "[ETA]Eta failed to run \": %i\n", ret);
 	}
 	else
@@ -104,6 +89,10 @@ int eta_execute_n(char *string, size_t size)
 		printk(KERN_INFO "[ETA]execute ok, ret = %d\n", ret);
 	}
 
+	if (!wait)
+		msleep(100);
+
+//	kfree(cmdstr);
 	return ret;
 }
 
@@ -146,7 +135,7 @@ int base64_decode(char *text, unsigned char *dst, int numBytes)
 	int d, prev_d = 0; 
 	unsigned char c;
 
-	//printk(KERN_INFO "[ETA] text: 0x%X, dst: 0x%X, size: %d\n",  (unsigned int)text, (unsigned int)dst, numBytes);
+	printk(KERN_INFO "[ETA] text: 0x%X, dst: 0x%X, size: %d\n",  (unsigned int)text, (unsigned int)dst, numBytes);
 		
 	space_idx = 0; 
 	phase = 0;
@@ -160,21 +149,21 @@ int base64_decode(char *text, unsigned char *dst, int numBytes)
 	        		break; 
 	        	case 1: 
 	          		c = ( ( prev_d << 2 ) | ( ( d & 0x30 ) >> 4 ) );
-				//printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
+				printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
 	          		if ( space_idx < numBytes )
 		            dst[space_idx++] = c; 
 			        ++phase; 
 	    		    break; 
 		        case 2: 
 		        	c = ( ( ( prev_d & 0xf ) << 4 ) | ( ( d & 0x3c ) >> 2 ) );
-				//printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
+				printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
 			        if ( space_idx < numBytes ) 
 	         		dst[space_idx++] = c; 
 	          		++phase; 
 	          		break; 
 	        	case 3: 
 	          		c = ( ( ( prev_d & 0x03 ) << 6 ) | d ); 
-				//printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
+				printk(KERN_INFO "[ETA] space_idx: 0x%X, char: 0x%X\n",  space_idx, c);
 	          		if ( space_idx < numBytes ) 
 	            	dst[space_idx++] = c; 
 	          		phase = 0; 
@@ -183,7 +172,7 @@ int base64_decode(char *text, unsigned char *dst, int numBytes)
 	      	prev_d = d; 
 		}
 	}
-	//printk(KERN_INFO "[ETA] Complete..\n");
+	printk(KERN_INFO "[ETA] Complete..\n");
 	return space_idx;
 }
 
@@ -238,7 +227,7 @@ void ats_mtc_send_key_log_to_eta(struct ats_mtc_key_log_type* p_ats_mtc_key_log)
 	eta_cmd_buf_encoded = kmalloc(sizeof(unsigned char)*50, GFP_KERNEL);
 	if(!eta_cmd_buf_encoded) {
 		printk(KERN_ERR "%s: Error in alloc memory!!\n", __func__);
-		kfree(eta_cmd_buf_encoded);
+		kfree(eta_cmd_buf);
 		return;
 	}
 	memset(eta_cmd_buf,0x00, 50);
@@ -289,9 +278,8 @@ void ats_mtc_send_key_log_to_eta(struct ats_mtc_key_log_type* p_ats_mtc_key_log)
 	}
 
 	lenb64 = base64_encode((char *)eta_cmd_buf, index, (char *)eta_cmd_buf_encoded);
-
-	exec_result = eta_execute_n(eta_cmd_buf_encoded, strlen(eta_cmd_buf_encoded));
-	
+			
+	exec_result = eta_execute(eta_cmd_buf_encoded);
 	printk(KERN_INFO "[ETA]AT+MTC exec_result %d\n",exec_result);
 
 	kfree(eta_cmd_buf);
@@ -300,105 +288,8 @@ void ats_mtc_send_key_log_to_eta(struct ats_mtc_key_log_type* p_ats_mtc_key_log)
 }
 EXPORT_SYMBOL(ats_mtc_send_key_log_to_eta);
 
-// MOD 0010090: [FactoryReset] Enable Recovery mode FactoryReset
-#define MMC_DEVICENAME "/dev/block/mmcblk0"
-#define MMC_XCALBACKUP_START_SECTOR	0x3a0000
+// LS696_me : CAL BACKUP merge
 #define MMC_XCALBACKUP_DATA_SIZE	40276 // therm add //5332 //add xo //5256 //hdet v2 //5220
-uint CalBackUp_Write( off_t write_pos, unsigned char *pBuffer, uint size)
-{
-	int fd;
-	//char *dest = (void *)0;
-	off_t fd_offset;
-	uint write_bytes = 0;
-	printk(KERN_INFO "[CalBackUp_Write] write_pos [%d] size [%d]\n", (int)write_pos, (int)size);
-	
-	if ( (fd = sys_open((const char __user *) MMC_DEVICENAME, O_RDWR, 0) ) < 0 )
-	{
-		printk(KERN_ERR "[CalBackUp] Can not access persist backup storage\n");
-		goto file_fail;
-	}
-	fd_offset = sys_lseek(fd, (off_t) (MMC_XCALBACKUP_START_SECTOR*512)+write_pos, 0); 
-	printk(KERN_INFO "[CalBackUp_Write] fd_offset [%d]\n", (int)fd_offset);
-
-	if(( write_bytes = sys_write(fd, (const char __user *) pBuffer, size)) < 0)
-	{
-		printk(KERN_ERR "[CalBackUp] Can not write persist backup storage \n");
-		goto file_fail;
-	}
-
-file_fail:
-	sys_close(fd);
-	return write_bytes;
-}
-
-uint32_t CalBackUp_Erase(void)
-{
-	unsigned char *empty_cal;
-	off_t fd_offset;
-	int fd;
-	uint write_bytes = 0;
-	
-	empty_cal = kmalloc(sizeof(unsigned char)*MMC_XCALBACKUP_DATA_SIZE, GFP_KERNEL);
-	memset(empty_cal, 0, MMC_XCALBACKUP_DATA_SIZE);
-	
-	printk(KERN_INFO "[CalBackUp_Erase]\n");
-	
-	if ( (fd = sys_open((const char __user *) MMC_DEVICENAME, O_RDWR, 0) ) < 0 )
-	{
-		printk(KERN_ERR "[CalBackUp_Erase] Can not access persist backup storage\n");
-		goto file_fail;
-	}
-	fd_offset = sys_lseek(fd, (off_t) (MMC_XCALBACKUP_START_SECTOR*512), 0); 
-	printk(KERN_INFO "[CalBackUp_Erase] fd_offset [%d]\n", (int)fd_offset);
-
-	if(( write_bytes = sys_write(fd, (const char __user *) empty_cal, MMC_XCALBACKUP_DATA_SIZE)) < 0)
-	{
-		printk(KERN_ERR "[CalBackUp_Erase] Can not write persist backup storage \n");
-		goto file_fail;
-	}
-
-file_fail:
-	sys_close(fd);
-
-
-
-	kfree(empty_cal);
-	return fd;
-}
-uint32_t CalBackUp_Read(off_t to_read_pos, unsigned char *pBuffer, long *size)
-{
-	int fd;
-	//char *dest = (void *)0;
-	//off_t fd_offset;
-	//off_t fd_end_offset;
-	unsigned int read_bytes;
-	uint32_t remain_bytes = 0;
-	if ( (fd = sys_open((const char __user *) MMC_DEVICENAME, /*O_CREAT |*/ O_RDWR, 0) ) < 0 )
-	{
-		printk(KERN_ERR "[CalBackUp] Can not access persist backup storage\n");
-		goto file_fail;
-	}
-
-	sys_lseek(fd, (off_t) (MMC_XCALBACKUP_START_SECTOR*512)+(to_read_pos*512), 0);
-	read_bytes = sys_read(fd, (char __user *) pBuffer, MAX_STRING_RET);
-	*size = read_bytes;
-	printk(KERN_ERR "[CalBackUp] to_read_pos[%d] read_bytes[%d]\n",(int)to_read_pos, (int)read_bytes);
-	
-	if ( read_bytes < 0 )
-	{
-		printk(KERN_ERR "[CalBackUp]Can not read persist backup storage \n");
-		goto file_fail;
-	}
-	if ( (MMC_XCALBACKUP_DATA_SIZE-(to_read_pos*512)) < (MAX_STRING_RET))
-		remain_bytes = 0;
-	else
-		remain_bytes = (MMC_XCALBACKUP_DATA_SIZE-(to_read_pos*512));
-file_fail:
-	sys_close(fd);
-	return remain_bytes;
-}
-
-typedef unsigned long qword[ 2 ];
 
 typedef struct MmcPartition MmcPartition;
 
@@ -418,6 +309,7 @@ extern int lge_read_block(int secnum, unsigned char *buf, size_t size);
 extern int lge_mmc_scan_partitions(void);
 extern const MmcPartition *lge_mmc_find_partition_by_name(const char *name);
 extern void lge_mmc_print_partition_status(void);
+// END: 0010090 sehyuny.kim@lge.com 2010-10-21
 
 int lge_ats_handle_atcmd_eta(struct msm_rpc_server *server,
 								 struct rpc_request_hdr *req, unsigned len)
@@ -429,28 +321,15 @@ int lge_ats_handle_atcmd_eta(struct msm_rpc_server *server,
 	uint32_t ret_value2 = 0;
 	static AT_SEND_BUFFER_t totalBuffer[LIMIT_MAX_SEND_SIZE_BUFFER];
 	static uint32_t totalBufferSize = 0;
-// MOD 0010090: [FactoryReset] Enable Recovery mode FactoryReset
-	static uint32_t write_pos = 0;
-// END: 0010090
 	uint32_t at_cmd,at_act;
 	int len_b64;
-	//char *decoded_params;
-	static AT_SEND_BUFFER_t decoded_params[LIMIT_MAX_SEND_SIZE_BUFFER];
+	char *decoded_params;
 	unsigned char b0;
 	unsigned char b1;
 	unsigned char b2;
 	unsigned char b3;
 	unsigned long logmask = 0x00;
 	struct rpc_ats_atcmd_eta_args *args = (struct rpc_ats_atcmd_eta_args *)(req + 1);
-	int mtd_op_result = 0;
-
-/* ADD 0012790: [ERI] DIAG DOWNLOAD */
-#ifdef CONFIG_LGE_ERI_DOWNLOAD
-	int filefd;
-	struct file *phMscd_Filp = NULL;
-	mm_segment_t old_fs;
-	ssize_t write_size = 0;
-#endif
 
 	memset(server->retvalue.ret_string, 0, sizeof(server->retvalue.ret_string));
 
@@ -472,11 +351,9 @@ int lge_ats_handle_atcmd_eta(struct msm_rpc_server *server,
 		
 	printk(KERN_INFO "[ETA]handle_misc_rpc_call at_cmd = 0x%X, at_act=%d, sendNum=%d:\n",
 	      args->at_cmd, args->at_act,args->sendNum);
-	/* comment out unnecessary logs
 	printk(KERN_INFO "[ETA]handle_misc_rpc_call endofBuffer = %d, buffersize=%d:\n",
 	      args->endofBuffer, args->buffersize);
 	printk(KERN_INFO "[ETA]input buff[0] = 0x%X,buff[1]=0x%X,buff[2]=0x%X:\n",args->buffer[0],args->buffer[1],args->buffer[2]);
-	*/
 	if(args->sendNum < MAX_SEND_LOOP_NUM)
 	{
 		for(loop = 0; loop < args->buffersize; loop++)
@@ -489,10 +366,9 @@ int lge_ats_handle_atcmd_eta(struct msm_rpc_server *server,
 		totalBufferSize += args->buffersize;
 			
 	}
-	/* comment out unnecessary logs
 	printk(KERN_INFO "[ETA]handle_misc_rpc_call buff[0] = 0x%X, buff[1]=0x%X, buff[2]=0x%X\n",
 	      totalBuffer[0 + args->sendNum*MAX_SEND_SIZE_BUFFER], totalBuffer[1 + args->sendNum*MAX_SEND_SIZE_BUFFER], totalBuffer[2+args->sendNum*MAX_SEND_SIZE_BUFFER]);
-	*/
+
 	if(!args->endofBuffer )
 		return HANDLE_OK_MIDDLE;
 
@@ -508,6 +384,8 @@ uint32_t at_cmd,at_act;
 ///////////////////////////////////////////////////
 	switch (at_cmd)
 	{
+// LS696_me : CAL BACKUP merge
+// BEGIN: 0010090 sehyuny.kim@lge.com 2010-10-21
 // MOD 0010090: [FactoryReset] Enable Recovery mode FactoryReset
 		case MP2AP_CALBACKUP:
 		{
@@ -519,17 +397,12 @@ uint32_t at_cmd,at_act;
 					const MmcPartition *pXcal_part = NULL; 
 					unsigned long xcalbackup_bytes_pos_in_emmc = 0;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pXcal_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pXcal_part == NULL )
 					{
-						printk(KERN_ERR "NO XCAL\n");
+						printk(KERN_INFO"NO XCAL\n");
 						return 0;
 					}
 
@@ -538,7 +411,7 @@ uint32_t at_cmd,at_act;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 					erase_bytes = lge_erase_block(xcalbackup_bytes_pos_in_emmc,PTN_XCAL_POSITION_IN_MISC_PARTITION);
 #endif
-					printk(KERN_INFO "[CAL BACKUP]handle_misc_rpc_call offset : 0x%lX, erase_bytes[%d]\n", xcalbackup_bytes_pos_in_emmc, erase_bytes);
+					printk(KERN_INFO "[CAL BACKUP]handle_misc_rpc_call offset : 0x%X, erase_bytes[%d]\n", xcalbackup_bytes_pos_in_emmc, erase_bytes);
 					break;
 				}
 				case CALBACKUP_CAL_READ:
@@ -551,21 +424,16 @@ uint32_t at_cmd,at_act;
 					unsigned long xcalbackup_bytes_pos_in_emmc = 0;	
 					unsigned char *eta_cmd_buf_encoded;					
 					
-					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ *read_seek_pos[%d]\n",(int)*read_seek_pos);
+					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ *read_seek_pos[%d]\n",*read_seek_pos);
 
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pXcal_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					// pXcal_part = lge_mmc_find_partition_by_name("xcalbackup");
 					if ( pXcal_part == NULL )
 					{
-						printk(KERN_ERR "NO XCAL\n");
+						printk(KERN_INFO"NO XCAL\n");
 						return 0;
 					}
 
@@ -579,7 +447,7 @@ uint32_t at_cmd,at_act;
 					memset(eta_cmd_buf_encoded,0x00, MAX_EMMC_STRING_RET);
 
 					xcalbackup_bytes_pos_in_emmc = (pXcal_part->dfirstsec*512) + (PTN_XCAL_POSITION_IN_MISC_PARTITION + (*read_seek_pos * MAX_EMMC_STRING_RET));
-					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ xcalbackup_bytes_pos_in_emmc[0x%lX]\n", xcalbackup_bytes_pos_in_emmc);
+					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ xcalbackup_bytes_pos_in_emmc[%d]\n",xcalbackup_bytes_pos_in_emmc);
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 					read_bytes = lge_read_block(xcalbackup_bytes_pos_in_emmc,(unsigned char *) eta_cmd_buf_encoded, MAX_EMMC_STRING_RET);
 #endif
@@ -588,7 +456,7 @@ uint32_t at_cmd,at_act;
 
 					lenb64 = base64_encode((char *)eta_cmd_buf_encoded, read_bytes, (char *)ret_string);
 
-					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ lenb64[%ld]\n", lenb64);
+					printk(KERN_INFO "[ETA]CALBACKUP_CAL_READ lenb64[%d]\n", lenb64);
 
 					//if ( (MMC_XCALBACKUP_DATA_SIZE-(*read_seek_pos * MAX_EMMC_STRING_RET)) < (MAX_EMMC_STRING_RET))
 					//	remain_bytes = 0;
@@ -611,24 +479,17 @@ uint32_t at_cmd,at_act;
 
 				case NVCRC_BACKUP_WRITE:
 				{
-					printk(KERN_ERR "not supported\n");
-/*
 					const MmcPartition *pMisc_part = NULL; 
 					unsigned long misc_bytes_pos_in_emmc = 0;
 
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pMisc_part == NULL )
 					{
 					
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 					
@@ -636,29 +497,20 @@ uint32_t at_cmd,at_act;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 					lge_write_block(misc_bytes_pos_in_emmc,totalBuffer,totalBufferSize);					
 #endif
-*/
-
 					break;
 				}
 				case NVCRC_BACKUP_READ:
 				{
-					printk(KERN_ERR "not supported\n");
-/*
 					const MmcPartition *pMisc_part = NULL; 
 					unsigned long misc_bytes_pos_in_emmc = 0;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pMisc_part == NULL )
 					{
 					
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 					
@@ -666,7 +518,6 @@ uint32_t at_cmd,at_act;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 					lge_read_block(misc_bytes_pos_in_emmc,(unsigned char *) ret_string, 512);
 #endif
-*/
 					break;
 				}
 				
@@ -675,28 +526,18 @@ uint32_t at_cmd,at_act;
 				case WLAN_MAC_ADDRESS_BACKUP_WRITE:
 				case PF_NIC_MAC_BACKUP_WRITE:
 				case CALBACKUP_ESN_WRITE:
-#ifdef CONFIG_LGE_USB_ACCESS_LOCK
-				case USB_ACCESS_LOCK_WRITE:
-				case USB_LOCK_KEY_WRITE:
-				case USB_UNLOCK_FAIL_CNT_WRITE:
-#endif
 				{
 					const MmcPartition *pMisc_part = NULL; 
 					unsigned long misc_bytes_pos_in_emmc = 0;
 
 #ifdef CONFIG_LGE_EMMC_SUPPORT					
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pMisc_part == NULL )
 					{
 					
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 
@@ -710,14 +551,6 @@ uint32_t at_cmd,at_act;
 						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_WLAN_MAC_PERSIST_POSITION_IN_MISC_PARTITION;
 					else if(at_act == PF_NIC_MAC_BACKUP_WRITE)
 						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_PF_NIC_MAC_PERSIST_POSITION_IN_MISC_PARTITION;
-#ifdef CONFIG_LGE_USB_ACCESS_LOCK
-					else if(at_act == USB_ACCESS_LOCK_WRITE)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_ACCESS_LOCK_PERSIST_POSITION_IN_MISC_PARTITION;
-					else if(at_act == USB_LOCK_KEY_WRITE)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_LOCK_KEY_PERSIST_POSITION_IN_MISC_PARTITION;
-					else if(at_act == USB_UNLOCK_FAIL_CNT_WRITE)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_UNLOCK_FAIL_CNT_PERSIST_POSITION_IN_MISC_PARTITION;
-#endif
 
 					printk("%s, 0x%lX\n", __func__, misc_bytes_pos_in_emmc);
 					printk("%s, %s\n", __func__, totalBuffer);
@@ -732,28 +565,17 @@ uint32_t at_cmd,at_act;
 				case WLAN_MAC_ADDRESS_BACKUP_READ:
 				case PF_NIC_MAC_BACKUP_READ:
 				case CALBACKUP_ESN_READ:
-#ifdef CONFIG_LGE_USB_ACCESS_LOCK
-				case USB_ACCESS_LOCK_READ:
-				case USB_LOCK_KEY_READ:
-				case USB_UNLOCK_FAIL_CNT_READ:
-#endif
-
 				{
 					const MmcPartition *pMisc_part = NULL; 
 					unsigned long misc_bytes_pos_in_emmc = 0;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pMisc_part == NULL )
 					{
 					
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 
@@ -767,21 +589,13 @@ uint32_t at_cmd,at_act;
 						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_WLAN_MAC_PERSIST_POSITION_IN_MISC_PARTITION;
 					else if(at_act == PF_NIC_MAC_BACKUP_READ)
 						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_PF_NIC_MAC_PERSIST_POSITION_IN_MISC_PARTITION;
-#ifdef CONFIG_LGE_USB_ACCESS_LOCK
-					else if(at_act == USB_ACCESS_LOCK_READ)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_ACCESS_LOCK_PERSIST_POSITION_IN_MISC_PARTITION;
-					else if(at_act == USB_LOCK_KEY_READ)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_LOCK_KEY_PERSIST_POSITION_IN_MISC_PARTITION;
-					else if(at_act == USB_UNLOCK_FAIL_CNT_READ)
-						misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_USB_UNLOCK_FAIL_CNT_PERSIST_POSITION_IN_MISC_PARTITION;
-#endif
 
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 					lge_read_block(misc_bytes_pos_in_emmc,(unsigned char *) ret_string, 512);
 #endif
 					break;
 				}
-				/*
+				/* TBD
                 case USBID_REMOTE_WRITE:
 				{
 					unsigned short pid;
@@ -793,18 +607,13 @@ uint32_t at_cmd,at_act;
 
 					printk("%s, USBID REMOTE WRITE\n", __func__);
 #ifdef CONFIG_LGE_EMMC_SUPPORT
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 #endif
 					if ( pMisc_part == NULL )
 					{
 					
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 
@@ -825,23 +634,18 @@ uint32_t at_cmd,at_act;
 					unsigned short *read_seek_pos = (unsigned short *) &totalBuffer[0];
 					int  read_bytes;
 					long lenb64 = 0;
-					//unsigned int remain_bytes = 0;
+					unsigned int remain_bytes = 0;
 					const MmcPartition *pXcal_part; 
 					unsigned long xcalbackup_bytes_pos_in_emmc = 0; 
 					unsigned char *eta_cmd_buf_encoded; 				
 					
-					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ *read_seek_pos[%d]\n",(int)*read_seek_pos);
+					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ *read_seek_pos[%d]\n",*read_seek_pos);
 
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pXcal_part = lge_mmc_find_partition_by_name("misc");
 					if ( pXcal_part == NULL )
 					{
-						printk(KERN_ERR "NO WEB_SID\n");
+						printk(KERN_INFO"NO WEB_SID\n");
 						return 0;
 					}
 
@@ -855,13 +659,13 @@ uint32_t at_cmd,at_act;
 					memset(eta_cmd_buf_encoded,0x00, MAX_EMMC_STRING_RET);
 
 					xcalbackup_bytes_pos_in_emmc = (pXcal_part->dfirstsec*512) + (PTN_WEB_SID_POSITION_IN_MISC_PARTITION + (*read_seek_pos * MAX_EMMC_STRING_RET));
-					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ xcalbackup_bytes_pos_in_emmc[0x%lX]\n",xcalbackup_bytes_pos_in_emmc);
+					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ xcalbackup_bytes_pos_in_emmc[%d]\n",xcalbackup_bytes_pos_in_emmc);
 					read_bytes = lge_read_block(xcalbackup_bytes_pos_in_emmc,(unsigned char *) eta_cmd_buf_encoded, MAX_EMMC_STRING_RET);
 					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ read_bytes[%d]\n",read_bytes);
 
 					lenb64 = base64_encode((char *)eta_cmd_buf_encoded, read_bytes, (char *)ret_string);
 
-					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ lenb64[%ld]\n", lenb64);
+					printk(KERN_INFO "[ETA]WEB_SID_REMARK_READ lenb64[%d]\n", lenb64);
 
 					ret_value1 = 0;			
 					ret_value2 = lenb64;
@@ -875,16 +679,11 @@ uint32_t at_cmd,at_act;
 					const MmcPartition *pMisc_part; 
 					unsigned long misc_bytes_pos_in_emmc = 0;
 
-					mtd_op_result = lge_mmc_scan_partitions();
-					if(mtd_op_result < 0)
-					{
-						printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-						return 0;
-					}
+					lge_mmc_scan_partitions();
 					pMisc_part = lge_mmc_find_partition_by_name("misc");
 					if ( pMisc_part == NULL )
 					{
-						printk(KERN_ERR "NO MISC\n");
+						printk(KERN_INFO"NO MISC\n");
 						return 0;
 					}
 					misc_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512) + PTN_WEB_SID_POSITION_IN_MISC_PARTITION;
@@ -899,19 +698,14 @@ uint32_t at_cmd,at_act;
 						const MmcPartition *pXcal_part = NULL; 
 						unsigned long xcalbackup_bytes_pos_in_emmc = 0;
 #ifdef CONFIG_LGE_EMMC_SUPPORT						
-						mtd_op_result = lge_mmc_scan_partitions();
-						if(mtd_op_result < 0)
-						{
-							printk(KERN_ERR "NOT READY! unable to scan partitions\n");
-							return 0;
-						}
+						lge_mmc_scan_partitions();
 						pXcal_part = lge_mmc_find_partition_by_name("misc");
 #endif
 						// pXcal_part = lge_mmc_find_partition_by_name("xcalbackup");
 						if ( pXcal_part == NULL )
 						{
 						
-							printk(KERN_ERR "NO XCAL\n");
+							printk(KERN_INFO"NO XCAL\n");
 							return 0;
 						}
 
@@ -919,34 +713,50 @@ uint32_t at_cmd,at_act;
 #ifdef CONFIG_LGE_EMMC_SUPPORT
 						written_bytes = lge_write_block(xcalbackup_bytes_pos_in_emmc,totalBuffer,totalBufferSize);
 #endif
-						printk(KERN_INFO "[ETA]handle_misc_rpc_call, offset : 0x%lX, written_bytes[%d]\n", xcalbackup_bytes_pos_in_emmc, written_bytes);
+						printk(KERN_INFO "[ETA]handle_misc_rpc_call, offset : 0x%X, written_bytes[%d]\n", xcalbackup_bytes_pos_in_emmc, written_bytes);
 						ret_value1 = written_bytes;
-						write_pos = 0;
+
 						break;
 					}
 			}
 			break;
 		}
+// END: 0010090 sehyuny.kim@lge.com 2010-10-21
 
 		case ATCMD_MTC:
 		{
 			int exec_result =0;
 
-			//printk(KERN_INFO "\n[ETA]ATCMD_MTC\n ");
-
+			printk(KERN_INFO "\n[ETA]ATCMD_MTC\n ");
+			/* LGE_CHANGE
+			 * Support MTC using diag port 
+			 * 2010-07-11 taehung.kim@lge.com
+			 */
 #ifdef CONFIG_LGE_DIAG_MTC
 			g_diag_mtc_check = 0;
 #endif
-#ifdef CONFIG_LGE_DIAG_ICD
-			g_diag_icd_check = 0;
-#endif
-
 			if(at_act != ATCMD_ACTION)
 				result = HANDLE_FAIL;
 
-			//printk(KERN_INFO "[ETA]totalBuffer : [%s] size: %d\n", totalBuffer, totalBufferSize);
-			exec_result = eta_execute_n(totalBuffer, totalBufferSize +1 ); //LGE_UPDATE [irene.park@lge.com] totalBuffesize increase + 1 ( Null size )
-			//printk(KERN_INFO "[ETA]AT+MTC exec_result %d\n",exec_result);
+			printk(KERN_INFO "[ETA]totalBuffer : [%s] size: %d\n", totalBuffer, totalBufferSize);
+
+			decoded_params = kmalloc(sizeof(char)*totalBufferSize, GFP_KERNEL);
+			if(!decoded_params) {
+				printk(KERN_ERR "%s: Insufficent memory!!!\n", __func__);
+				result = HANDLE_ERROR;
+				break;
+			}
+			printk(KERN_INFO "[ETA] encoded_addr: 0x%X, decoded_addr: 0x%X, size: %d\n",  (unsigned int)totalBuffer, (unsigned int)decoded_params, sizeof(char)*totalBufferSize);
+			
+			len_b64 = base64_decode((char *)totalBuffer, (unsigned char *)decoded_params, totalBufferSize);
+			printk(KERN_INFO "[ETA] sub cmd: 0x%X, param1: 0x%X, param2: 0x%X (length = %d)\n",  
+			decoded_params[1], decoded_params[2], decoded_params[3], strlen(decoded_params));
+
+			if (decoded_params[1] == 0x33)
+				exec_result = eta_execute_n(totalBuffer, totalBufferSize +1, 0 ); //LGE_UPDATE [irene.park@lge.com] totalBuffesize increase + 1 ( Null size )
+			else
+				exec_result = eta_execute_n(totalBuffer, totalBufferSize +1, 1 ); //LGE_UPDATE [irene.park@lge.com] totalBuffesize increase + 1 ( Null size )
+			printk(KERN_INFO "[ETA]AT+MTC exec_result %d\n",exec_result);
 			
 /*
 			if((temp = (char *)strchr((const char *)totalBuffer, (int)'=') + 1) == NULL) {
@@ -954,22 +764,7 @@ uint32_t at_cmd,at_act;
 				result = HANDLE_FAIL;
 			}
 			encoded_params = temp;
-*/
-
-/*
-			decoded_params = kmalloc(sizeof(char)*totalBufferSize, GFP_KERNEL);
-			if(!decoded_params) {
-				printk(KERN_ERR "%s: Insufficent memory!!!\n", __func__);
-				result = HANDLE_ERROR;
-				break;
-			}
-*/
-			memset(decoded_params, 0, sizeof(decoded_params));
-			//printk(KERN_INFO "[ETA] encoded_addr: 0x%X, decoded_addr: 0x%X, size: %d\n",  (unsigned int)totalBuffer, (unsigned int)decoded_params, sizeof(char)*totalBufferSize);
-			
-			len_b64 = base64_decode((char *)totalBuffer, (unsigned char *)decoded_params, totalBufferSize);
-			printk(KERN_INFO "[ETA] sub cmd: 0x%X, param1: 0x%X, param2: 0x%X (length = %d)\n",  
-			decoded_params[1], decoded_params[2], decoded_params[3], strlen(decoded_params));
+*/		
 
 			switch(decoded_params[1]) 
 			{
@@ -996,7 +791,7 @@ uint32_t at_cmd,at_act;
 							ats_mtc_log_mask = 0x00000000;//ETA_LOGMASK_DISABLE_ALL;
 							break;
 					}
-
+/* add key log by younchan.kim*/
 					if(logmask & 0xFFFFFFFF)
 						event_log_start();
 					else
@@ -1006,128 +801,15 @@ uint32_t at_cmd,at_act;
 				default:
 					break;
 			}
-
-			/*
+			
 			kfree(decoded_params);
-			*/
+
 			sprintf(ret_string, "edcb");
 			ret_value1 = 10;
 			ret_value2 = 20;
 
 		}
 		break;
-
-/* ADD 0012790: [ERI] DIAG DOWNLOAD */
-// this will be sent from modem
-#ifdef CONFIG_LGE_ERI_DOWNLOAD
-		case ATCMD_ERI_DLOAD:
-		{
-			printk(KERN_INFO "\n%s, eri download, size : %d, written_size : %d\n ", __func__, totalBufferSize, (int)written_size);
-			/*
-			if(at_act != ATCMD_ACTION)
-			{
-				printk(KERN_ERR "\n%s, eri download failed, at_act : %d\n ", __func__, at_act);
-				result = HANDLE_FAIL;
-				break;
-			}
-			*/
-			
-			// totalBuffer has eri data and totalBufferSize indicates its length.
-			if(totalBufferSize <= 0)
-			{
-				printk(KERN_ERR "\n%s, eri download failed, size : %d\n ", __func__, totalBufferSize);
-				result = HANDLE_FAIL;
-				break;
-			}
-			
-			old_fs=get_fs();
-			set_fs(get_ds());
-
-			// you may need to create eri directory in advance to get the open handler. see init.xx.rc
-			// careful of option, data might be 0 in case of O_CREAT
-			if(written_size == 0)
-			{
-				// cosider new file in case the written size is 0
-				printk(KERN_INFO "%s, unlink the file if exist and create\n", __func__);
-				phMscd_Filp = filp_open(ERI_FILENAME, O_RDWR |O_LARGEFILE, 0);
-				if(phMscd_Filp)
-					sys_unlink(ERI_FILENAME);
-				phMscd_Filp = filp_open(ERI_FILENAME, O_RDWR | O_CREAT |O_LARGEFILE, 0);
-			}
-			else
-				phMscd_Filp = filp_open(ERI_FILENAME, O_RDWR |O_LARGEFILE, 0);
-
-			if( !phMscd_Filp)
-			{
-				printk(KERN_ERR "%s Can't open %s\n", __func__, ERI_FILENAME);
-				result = HANDLE_FAIL;
-				break;
-			}
-
-			// the data size might be greater than the limitation, at_act was supposed to be used as the writting position but hard to handle the last packet
-			phMscd_Filp->f_pos = written_size;
-
-			phMscd_Filp->f_op->llseek(phMscd_Filp, &phMscd_Filp->f_pos, SEEK_SET);
-			write_size = phMscd_Filp->f_op->write(phMscd_Filp, totalBuffer, totalBufferSize, &phMscd_Filp->f_pos);
-			written_size += write_size;
-			printk(KERN_INFO "%s, position : 0x%x, write_size : %d(0x%X) \n", __func__, (int)phMscd_Filp->f_pos, (int)write_size, (int)write_size);
-			if(write_size <= 0)
-			{
-				printk(KERN_ERR "%s eri download failed, write size : %d\n", __func__, (int)write_size);
-				result = HANDLE_FAIL;
-				break;
-			}
-			filp_close(phMscd_Filp,NULL);
-			set_fs(old_fs);
-
-			// the last packet(0xFFFFFFFF) or total length is less than the limitation, initialize the written size
-			if((at_act == 0xFFFFFFFF) || ((at_act==0)&&(totalBufferSize<MAX_SEND_SIZE_BUFFER)))
-			{
-				written_size = 0;
-				printk(KERN_INFO "%s, Completed \n", __func__);
-			}
-
-			/* BEGIN: 0013860 jihoon.lee@lge.com 20110111 */
-			/* ADD 0013860: [FACTORY RESET] ERI file save */
-			// change owner and mode so that applications access this file.
-			sys_chown(ERI_FILENAME, AID_RADIO, AID_RADIO);
-			sys_chmod(ERI_FILENAME, S_IRWXUGO);
-			/* END: 0013860 jihoon.lee@lge.com 20110111 */
-			sprintf(ret_string, "edcb");
-			ret_value1 = 10;
-			ret_value2 = 20;
-		}
-		break;
-#endif
-
-#ifdef CONFIG_LGE_DIAG_ICD
-		case ATCMD_ICD:
-			g_diag_icd_check = 1;
-			printk(KERN_INFO "%s, ATCMD_ICD recieved action : %d\n", __func__, at_act);
-			if(at_act == ATCMD_ICD_LOGGING_START)
-			{
-#ifdef CONFIG_LGE_DIAG_ATS_ETA_MTC_KEY_LOGGING
-				event_log_start();
-				ats_mtc_log_mask = 0xFFFFFFFF; // //ETA_LOGMASK_ENABLE_ALL
-#endif			
-			}
-			else if(at_act == ATCMD_ICD_LOGGING_END)
-			{
-#ifdef CONFIG_LGE_DIAG_ATS_ETA_MTC_KEY_LOGGING
-				event_log_end();
-				ats_mtc_log_mask = 0x00000000; // //ETA_LOGMASK_DISABLE_ALL
-#endif
-			}
-			else
-			{
-				printk(KERN_ERR "%s, Unknown action : %d\n", __func__, at_act);
-			}
-
-			sprintf(ret_string, "edcb");
-			ret_value1 = 10;
-			ret_value2 = 20;
-			break;
-#endif
 
 		default :
 			result = HANDLE_ERROR;
@@ -1153,8 +835,8 @@ uint32_t at_cmd,at_act;
 	else
 		result= RPC_RETURN_RESULT_ERROR;
 
-	if(result != RPC_RETURN_RESULT_OK)
-		printk(KERN_INFO"%s: error resulte = %d\n", __func__, result);
+	printk(KERN_INFO"%s: resulte = %d\n",
+		   __func__, result);
 
 	return result;
 }

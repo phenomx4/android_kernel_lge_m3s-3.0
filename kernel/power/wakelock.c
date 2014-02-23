@@ -56,7 +56,7 @@ suspend_state_t requested_suspend_state = PM_SUSPEND_MEM;
 static struct wake_lock unknown_wakeup;
 static struct wake_lock suspend_backoff_lock;
 
-#ifdef CONFIG_LGE_SUSPEND_TIME
+#if 1
 static struct timespec suspend_time_before;
 static unsigned int time_in_suspend_bins[32];
 static void suspend_time_suspend(void);
@@ -356,7 +356,7 @@ static void suspend(struct work_struct *work)
 		return;
 	}
 
-#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+#if 1
 	save_suspend_step(SUSPEND_START);
 #endif
 	entry_event_num = current_event_num;
@@ -365,7 +365,7 @@ static void suspend(struct work_struct *work)
 		pr_info("suspend: enter suspend\n");
 	getnstimeofday(&ts_entry);
 
-#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+#if 1
 #ifdef CONFIG_LGE_SUSPEND_TIME
 	suspend_time_suspend();
 #endif
@@ -373,7 +373,7 @@ static void suspend(struct work_struct *work)
 	ret = pm_suspend(requested_suspend_state);
 	save_suspend_step(SUSPEND_EXITSUSPEND);
 	getnstimeofday(&ts_exit);
-#ifdef CONFIG_LGE_SUSPEND_TIME
+#if 1
 	suspend_time_resume();
 #endif
 #else 	/* CONFIG_LGE_DEBUGFS_SUSPEND */
@@ -407,7 +407,7 @@ static void suspend(struct work_struct *work)
 			pr_info("suspend: pm_suspend returned with no event\n");
 		wake_lock_timeout(&unknown_wakeup, HZ / 2);
 	}
-#if defined(CONFIG_LGE_DEBUGFS_SUSPEND)
+#if 1
 	save_suspend_step(SUSPEND_EXITDONE);
 #endif
 }
@@ -644,7 +644,7 @@ int wake_lock_active(struct wake_lock *lock)
 }
 EXPORT_SYMBOL(wake_lock_active);
 
-#ifdef CONFIG_LGE_SUSPEND_AUTOTEST
+#if 1
 int wake_lock_active_name(char *name)
 {
 	struct wake_lock *lock;
@@ -757,8 +757,8 @@ static void  __exit wakelocks_exit(void)
 #endif
 }
 
-#ifdef CONFIG_LGE_DEBUGFS_SUSPEND
-#ifdef CONFIG_LGE_SUSPEND_TIME
+#if 1
+#if 1
 static void suspend_time_suspend(void)
 {
 	getnstimeofday(&suspend_time_before);

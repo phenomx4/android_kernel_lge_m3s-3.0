@@ -27,6 +27,20 @@ config MMC_PERF_PROFILING
 	  If you say Y here, support will be added for collecting
 	  performance numbers at the MMC Queue and Host layers.
 
+config LGE_MMC_BRINGUP
+	bool "MMC Bringup codes"
+	depends on MACH_LGE
+	default n
+	help
+	  This enables mmc detection and PMIC / GPIO controls
+
+config LGE_MMC_WORKAROUND
+	bool "MMC work-around codes"
+	depends on MACH_LGE
+	default n
+	help
+	  This enables LGE MMC work-around codes to make stable
+
 if MMC
 
 source "drivers/mmc/core/Kconfig"

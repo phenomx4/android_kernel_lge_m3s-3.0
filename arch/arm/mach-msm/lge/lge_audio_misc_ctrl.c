@@ -78,7 +78,7 @@ struct snd_set_loopback_mode_msg {
 struct snd_set_loopback_mode_msg lmsg;
 
 
-//static int current_rx_voice_vol = 100;
+static int current_rx_voice_vol = 100;
 
 
 /*******************************************************************************
@@ -87,7 +87,6 @@ struct snd_set_loopback_mode_msg lmsg;
 *	dependencies : TEST_MISC_DRVR macro 
 *	Note: Exposed this function for kernal. Can test driver from any kernal event
 ********************************************************************************/
-
 #if TEST_MISC_DRVR
 #define TEST_RPC_CONNECT_FN 	1
 #define TEST_RPC_LB_FN      	2
@@ -164,6 +163,8 @@ enum {
   QTR_REC_MIC,
   QTR_CAM_MIC,
   QTR_VOICE_MIC,
+  QTR_HANDSET_LOOPBACK_MIC,
+  QTR_HEADSET_LOOPBACK_MIC,
   QTR_CAL_MAX
 };
 
@@ -175,24 +176,26 @@ enum {
 };
 
 #if 1
-  int QTR_index_data[14][4] = {
+  int QTR_index_data[16][4] = {
     {17,-1,-1,-1},
     {6,7,26,27},
     {6,7,27,28},
     {6,7,26,27},
-    {6,7,25,26},
-    {6,7,25,26},
     {6,7,27,28},
+    {6,7,27,28},
+    {6,7,28,29},
     {23,24,9,-1},
     {23,24,15,-1},
     {23,24,9,-1},
     {23,24,15,-1},
     {23,24,9,-1},
     {23,24,9,-1},
-    {23,24,9,-1}};
+    {23,24,9,-1},
+    {23,24,9,-1},
+    {23,24,15,-1}};
 
 u8 QTR_cal_data[QTR_CAL_MAX][4] = {
-    {0x01, 0xFF,0xFF,0xFF},
+    {0x8, 0xFF,0xFF,0xFF},
     {0x0,0x0,0x10,0x10},
     {0x08,0x08,0x10,0x10},
     {0x07,0x07,0x10,0x10},
@@ -203,9 +206,11 @@ u8 QTR_cal_data[QTR_CAL_MAX][4] = {
     {0x0,0x0,0xC8,0xFF},
     {0x05,0x05,0xC1,0xFF},
     {0x0,0x0,0x88,0xFF},
-    {0x0F,0x0F,0xD0,0xFF},
-    {0x0F,0x0F,0xD0,0xFF},
-    {0x05,0x05,0xD0,0xFF}};
+    {0x12,0x12,0xD0,0xFF},
+    {0x12,0x12,0xD0,0xFF},
+    {0x08,0x08,0xD0,0xFF},
+    {0x2,0x2,0xD0,0xFF},
+    {0x0,0x0,0xC8,0xFF}};
     
   s16 voice_level_data[4][2] = {
     {0,-1900},

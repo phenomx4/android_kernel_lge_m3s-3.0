@@ -96,8 +96,7 @@ static int suspend_test(int level)
 static int suspend_prepare(void)
 {
 	int error;
-	
-//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
+
 	if (!suspend_ops || !suspend_ops->enter)
 		return -EPERM;
 
@@ -155,7 +154,6 @@ static int suspend_enter(suspend_state_t state)
 {
 	int error;
 
-//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
 	if (suspend_ops->prepare) {
 		error = suspend_ops->prepare();
 		if (error)
@@ -221,7 +219,6 @@ int suspend_devices_and_enter(suspend_state_t state)
 {
 	int error;
 
-//	printk(KERN_INFO "%s:%d: entry\n",__func__, __LINE__);
 	if (!suspend_ops)
 		return -ENOSYS;
 

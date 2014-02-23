@@ -5,7 +5,7 @@
 #include "lge_comdef.h"
 #include "lge_diag_screen_shot.h"
 
-//#define SCREEN_SHOT_PACK_LEN  1024
+#define SCREEN_SHOT_PACK_LEN  1024
 
 typedef struct
 {

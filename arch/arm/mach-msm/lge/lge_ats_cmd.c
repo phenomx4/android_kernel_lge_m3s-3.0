@@ -15,13 +15,13 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <mach/msm_rpcrouter.h>
-//#include <mach/board-bryce.h>
-#include "lge_ats.h"
-#include "lge_ats_cmd.h"
+#include <mach/board_lge.h>
+#include <mach/lge_ats.h>
+#include <mach/lge_ats_cmd.h>
 
 int lge_ats_handle_atcmd(struct msm_rpc_server *server,
-							 struct rpc_request_hdr *req, unsigned len,
-							 void (*update_atcmd_state)(char *cmd, int state) )
+						 struct rpc_request_hdr *req, unsigned len,
+						 void (*update_atcmd_state)(char *cmd, int state) )
 {
 	struct rpc_ats_atcmd_args *args = (struct rpc_ats_atcmd_args *)(req + 1);
 	int result = HANDLE_OK;
@@ -69,7 +69,7 @@ int lge_ats_handle_atcmd(struct msm_rpc_server *server,
 			result = HANDLE_FAIL;
 		update_atcmd_state("fmr", at_param); //state is up? down?
 		break;
-		/*[LGE_CHANGE_S][Camera] AT Command AT_CAM AT_AVR */
+		/*[LGE_CHANGE_S][Camera][kwangsoo.park@lge.com 2010-05-26 : AT Command AT_CAM AT_AVR */
 	case ATCMD_AVR:	//45
 		if(at_act != ATCMD_ACTION)
 			result = HANDLE_FAIL;
@@ -80,13 +80,11 @@ int lge_ats_handle_atcmd(struct msm_rpc_server *server,
 			result = HANDLE_FAIL;
 		update_atcmd_state("cam", at_param); //state is up? down?
 		break;
-		/*[LGE_CHANGE_E[Camera] AT Command AT_CAM AT_AVR */
+		/*[LGE_CHANGE_E[Camera][kwangsoo.park@lge.com 2010-05-26 : AT Command AT_CAM AT_AVR */
 
-#ifdef CONFIG_LGE_ATS_MMC
 	case ATCMD_EMT:  // 46
 		ret_value1 = external_memory_test();
 		break;
-#endif
 
 	case ATCMD_FC:  // 59
 		if(at_act != ATCMD_ACTION)
@@ -132,7 +130,7 @@ int lge_ats_handle_atcmd(struct msm_rpc_server *server,
 
 		result = RPC_RETURN_RESULT_OK;
 	else
-		result= RPC_RETURN_RESULT_ERROR;
+		result = RPC_RETURN_RESULT_ERROR;
 
 	return result;
 }

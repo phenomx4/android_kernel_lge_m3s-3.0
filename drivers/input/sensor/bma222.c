@@ -7941,8 +7941,8 @@ int bma222_get_offset_unfilt_z(unsigned char *offsetfilt )
  *               0110            temporary, 8 s
  *               0111            latched
  *               1000            non-latched
- *               1001            temporary, 500 ?s
- *               1010            temporary, 500 ?s
+ *               1001            temporary, 500 行
+ *               1010            temporary, 500 行
  *               1011            temporary, 1 ms
  *               1100            temporary, 12.5 ms
  *               1101            temporary, 25 ms
@@ -8010,8 +8010,8 @@ int bma222_set_Int_Mode(unsigned char Mode )
  *               0110            temporary, 8 s
  *               0111            latched
  *               1000            non-latched
- *               1001            temporary, 500 ?s
- *               1010            temporary, 500 ?s
+ *               1001            temporary, 500 行
+ *               1010            temporary, 500 行
  *               1011            temporary, 1 ms
  *               1100            temporary, 12.5 ms
  *               1101            temporary, 25 ms

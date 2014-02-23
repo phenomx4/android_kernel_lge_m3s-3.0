@@ -12,15 +12,13 @@
 #include <linux/fs.h>
 #include <mach/lge_diagcmd.h>
 #include <linux/uaccess.h>
-#include <mach/lge_diag_mtc.h>
+
 
 /* ==========================================================================
 ===========================================================================*/
-#undef SCREEN_DBG
+/*  jihye.ahn   2010-10-01    convert RGBA8888 to RGB565 */
 #define LCD_BUFFER_SIZE LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * 4
-//extern unsigned short tmp_img_block[320*480*4];
-extern unsigned char lge_img_capture_32bpp[MTC_SCRN_BUF_32BPP_SIZE];
-extern unsigned char lge_img_capture_16bpp[MTC_SCRN_BUF_SIZE_MAX];
+extern unsigned short tmp_img_block[320*480*4];
 /* ==========================================================================
 ===========================================================================*/
 extern PACK(void *) diagpkt_alloc (diagpkt_cmd_code_type code, unsigned int length);
@@ -30,104 +28,26 @@ extern PACK(void *) diagpkt_alloc (diagpkt_cmd_code_type code, unsigned int leng
 lcd_buf_info_type lcd_buf_info;
 
 /*==========================================================================*/
-
-#ifdef SCREEN_DBG
-struct bmp_handle_t {
-	unsigned long file_size;
-	unsigned long reserved;
-	unsigned long data_offset;
-	unsigned long header_size;
-	unsigned long width;
-	unsigned long height;
-	unsigned short planes;
-	unsigned short bpp;
-	unsigned long compression;
-	unsigned long data_size;
-	unsigned long hresolution;
-	unsigned long vresolution;
-	unsigned long colors;
-	unsigned long important_colors;
-	void *palette;
-	char *data;
-};
-
-static void save_bmp_img(byte* name, byte* pBuf, unsigned long len)
+/* LGE_S     jihye.ahn   2010-10-01    convert RGBA8888 to RGB565 */
+static void to_rgb565(byte* from, u16* to)
 {
-	struct bmp_handle_t bmp;
-	int count;
-	struct file *phMscd_Filp = NULL;
-	mm_segment_t old_fs=get_fs();
+	int i;
+	int r,g,b;
+	u16 h;
 
-	set_fs(get_ds());
-
-	phMscd_Filp = filp_open(name, O_CREAT | O_RDWR | O_LARGEFILE, 0777);
-
-	if(IS_ERR(phMscd_Filp)) 
-	{
-		printk("open fail %s \n", name);
-		return;
-	}
-
-	// make bmp header
-	bmp.data_offset = 54;
-	bmp.bpp = 16;
-	bmp.data_size = LCD_MAIN_WIDTH * LCD_MAIN_HEIGHT * bmp.bpp / 8;
-	bmp.file_size = bmp.data_size + bmp.data_offset;
-	bmp.reserved = 0;
-	bmp.header_size = 0x28;	// windows 3.1x, 95, NT...
-	bmp.width = LCD_MAIN_WIDTH;
-	bmp.height = LCD_MAIN_HEIGHT;
-	bmp.planes = 1;
-	bmp.compression = 0;	// none
-	bmp.hresolution = 0x1711;
-	bmp.vresolution = 0x1711;
-	bmp.colors = 0;
-	bmp.important_colors = 0;
-
-	phMscd_Filp->f_pos = 0;
-
-	count = 0;
-	//count += write (fout, "BM", 2);
-	count += phMscd_Filp->f_op->write(phMscd_Filp, "BM", 2, &phMscd_Filp->f_pos);
-	//count += write (fout, &bmp.file_size, 52);
-	count += phMscd_Filp->f_op->write(phMscd_Filp, (const char __user *)&bmp.file_size, 52, &phMscd_Filp->f_pos);
-	//printf("bmp header written, count = %d\n", count);
-	//count += write (fout, buf_p, input);
-	count += phMscd_Filp->f_op->write(phMscd_Filp, pBuf, len, &phMscd_Filp->f_pos);
-	printk(KERN_INFO "[ETA] bmp written, count = %d bytes\n", count);
-
-	filp_close(phMscd_Filp,NULL);
+	for(i=0; i<LCD_BUFFER_SIZE; i+=4){
+		r=from[i];
+		g=from[i+1];
+		b=from[i+2];
 		
-	set_fs(old_fs);
+		h=(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3));
 
-}
-
-static void save_buf_img(byte* name, byte* pBuf, unsigned long len)
-{
-  struct file *phMscd_Filp = NULL;
-  mm_segment_t old_fs=get_fs();
-
-  set_fs(get_ds());
-
-  phMscd_Filp = filp_open(name, O_CREAT | O_RDWR | O_LARGEFILE, 0777);
-
-  if(IS_ERR(phMscd_Filp)) 
-  {
-    printk("open fail screen capture \n" );
-    return;
-  }
-
-   printk(KERN_INFO "path : %s, len : %ld\n", name, len);
-   
-   phMscd_Filp->f_pos = 0;
-
-   phMscd_Filp->f_op->write(phMscd_Filp, pBuf, len, &phMscd_Filp->f_pos);
-   filp_close(phMscd_Filp,NULL);
-
+		to[i/4]=h;
 	
-   set_fs(old_fs);
+	}
 }
-#endif
+/* LGE_E     jihye.ahn   2010-10-01    convert RGBA8888 to RGB565 */
+
 
 static void read_framebuffer(byte* pBuf)
 {
@@ -138,11 +58,11 @@ static void read_framebuffer(byte* pBuf)
 
   phMscd_Filp = filp_open("/dev/graphics/fb0", O_RDONLY |O_LARGEFILE, 0);
 
-  if(IS_ERR(phMscd_Filp)) 
-  {
-    printk("open fail screen capture \n" );
-    return;
-  }
+   if( !phMscd_Filp) 
+   {
+		printk("open fail screen capture \n" );
+		return;
+  	}
 
   phMscd_Filp->f_op->read(phMscd_Filp, pBuf, LCD_BUFFER_SIZE, &phMscd_Filp->f_pos);
   filp_close(phMscd_Filp,NULL);
@@ -150,42 +70,6 @@ static void read_framebuffer(byte* pBuf)
   set_fs(old_fs);
 
 }
-
-
-//static void to_rgb565(byte* from, u16* to)
-static void to_rgb565(byte* from, byte* to)
-{
-	int i;
-	int r,g,b;
-	//u16 h;
-
-	int index = 0;
-
-	for(i=0; i<LCD_BUFFER_SIZE; i+=4){
-		/*
-		r=from[i];
-		g=from[i+1];
-		b=from[i+2];
-		
-		h=(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3));
-
-		to[i/4]=h;
-		*/
-		r=((from[i]>>3)&0x1F);
-		g=((from[i+1]>>2)&0x3F);
-		b=((from[i+2]>>3)&0x1F);
-
-		// ignore alpa (every 4th bit)
-		to[index ++] = ((g&0x07)<<5)|b;
-		to[index ++] = ((r<<3)&0xF8)|((g>>3)&0x07);
-		
-		//h= ((((g&0x07)<<5)|b)&0x00FF) | (((((r<<3)&0xF8)|((g>>3)&0x07))<<8)&0xFF00);
-		//to[i/4]=h;
-		
-	
-	}
-}
-
 
 /*
 int removefile( char const *filename )
@@ -212,18 +96,14 @@ PACK (void *)LGF_ScreenShot (
         uint16		pkt_len )		      /* length of request packet   */
 {
 	diag_screen_shot_type *req_ptr = (diag_screen_shot_type *)req_pkt_ptr;
-	diag_screen_shot_type *rsp_ptr = 0;
-	int rsp_len=0;
+  	diag_screen_shot_type *rsp_ptr = 0;
+  	int rsp_len=0;
 
-//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Temporary blocking source for Test mode porting.
-#if 0 
-	uint8 red, green, blue;
-	int x_start=0,x_end=0;
-	int input=0;
-	byte *pImgBlock;
-	int x=0, y=0, i=0;
-#endif
-//LGE_CHANGE_S [US730] [TestMode] [jinhwan.do@lge.com] 2012-02-07, Temporary blocking source for Test mode porting.
+   byte *pImgBlock;
+   uint8 red, green, blue;
+   int x_start=0,x_end=0;
+   int input=0;
+	int x=0, y=0,i=0;
    
 printk("[UTS] %s, %d : cmd = %d, sub_cmd = %d\n",__func__,__LINE__,req_ptr->lcd_bk_ctrl.sub_cmd_code,req_ptr->lcd_buf.seq_flow);  
 
@@ -235,19 +115,11 @@ printk("[UTS] %s, %d : cmd = %d, sub_cmd = %d\n",__func__,__LINE__,req_ptr->lcd_
       		switch(req_ptr->lcd_buf.seq_flow)
       		{
         		case SEQ_START:
-					memset(lge_img_capture_32bpp, 0, sizeof(lge_img_capture_32bpp));
-					lcd_buf_info.buftmp = lge_img_capture_32bpp;
-					memset(lge_img_capture_16bpp, 0, sizeof(lge_img_capture_16bpp));
-					lcd_buf_info.buf = lge_img_capture_16bpp;
-					
           			rsp_len = sizeof(diag_lcd_get_buf_req_type);
           			rsp_ptr = (diag_screen_shot_type *)diagpkt_alloc(DIAG_LGF_SCREEN_SHOT_F, rsp_len - SCREEN_SHOT_PACK_LEN);
 
 		  			if (!rsp_ptr)
-		  			{
-		  				printk(KERN_ERR "%s rsp_ptr allocation failed!!!\n", __func__);
 		  				return 0;
-		  			}
 
 		          	lcd_buf_info.is_fast_mode = req_ptr->lcd_buf.is_fast_mode;
 		          	lcd_buf_info.full_draw = req_ptr->lcd_buf.full_draw;
@@ -261,15 +133,7 @@ printk("[UTS] %s, %d : cmd = %d, sub_cmd = %d\n",__func__,__LINE__,req_ptr->lcd_
 		          	lcd_buf_info.updated = TRUE;
                   #if 1
 		          	read_framebuffer(lcd_buf_info.buftmp );    // read file
-
-		          	//to_rgb565(lcd_buf_info.buftmp, (u16 *)lcd_buf_info.buf);
-		            to_rgb565(lcd_buf_info.buftmp, lcd_buf_info.buf);
-
-#ifdef SCREEN_DBG
-		            save_buf_img("/data/buftmp.img", lcd_buf_info.buftmp, (unsigned long)sizeof(lge_img_capture_32bpp));
-		            save_buf_img("/data/buf.img", lcd_buf_info.buf, (unsigned long)sizeof(lge_img_capture_16bpp));	
-		            save_bmp_img("/data/buf.bmp", lcd_buf_info.buf, (unsigned long)sizeof(lge_img_capture_16bpp));
-#endif
+                  to_rgb565(lcd_buf_info.buftmp,lcd_buf_info.buf);
                   #else
                   read_framebuffer((byte*)tmp_img_block);
                   pImgBlock = lcd_buf_info.buf;
